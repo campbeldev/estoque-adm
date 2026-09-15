@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% from "macros.html" import sugestoes_itens, sugestoes_valores %}
+{% set aba = 'entradas' %}
+{% block titulo %}Entradas{% endblock %}
+{% block conteudo %}
+<h1 class="h4 mb-3">Registrar entrada de estoque</h1>
+{{ sugestoes_itens(autocomplete) }}
+{{ sugestoes_valores(sugestoes_fornecedores, 'sugestoes-fornecedores') }}
+{{ sugestoes_valores(sugestoes_notas_numeros, 'sugestoes-notas-numeros') }}
+{{ sugestoes_valores(sugestoes_notas_series, 'sugestoes-notas-series') }}
+<div class="row">
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-body">
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <label class="form-label">Código ou nome do produto</label>
+            <input class="form-control input-leitura" name="codigo" autofocus autocomplete="off"
+                   placeholder="Digite o nome ou código" value="{{ form_data.codigo }}"
+                   list="sugestoes-itens" spellcheck="false">
+          </div>
+          {% if alternativas %}
+          <div class="mb-3">
+            <label class="form-label">Qual item? Clique para selecionar:</label>
+            <div>
+              {% for alt in alternativas %}
+              <button class="btn btn-sm btn-outline-primary mb-1" name="item_id" value="{{ alt.id }}" formnovalidate>
+                {{ alt.nome }} ({{ alt.codigo }})
+              </button>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+          <div class="row g-2">
+            <div class="col-3">
+              <label class="form-label">Quantidade *</label>
+              <input class="form-control" type="number" min="1" name="quantidade" value="{{ form_data.quantidade }}" required>
+            </div>
+            <div class="col-3">
+              <label class="form-label">Valor unitário *</label>
+              <input class="form-control" type="text" inputmode="decimal" name="valor_unitario"
+                     value="{{ form_data.valor_unitario }}" placeholder="0,00" required>
+              <div class="form-text">Vírgula ou ponto.</div>
+            </div>
+            <div class="col-3">
+              <label class="form-label">Validade (lote)</label>
+              <input class="form-control" type="date" name="validade" value="{{ form_data.validade }}">
+              <div class="form-text">Obrigatória para EPIs.</div>
+            </div>
+            <div class="col-3">
+              <label class="form-label">Data</label>
+              <input class="form-control" type="date" name="data" value="{{ form_data.data }}">
+              <div class="form-text">Vazio = agora.</div>
+            </div>
+          </div>
+          <div class="row g-2 mt-0">
+            <div class="col-5">
+              <label class="form-label">Fornecedor *</label>
+              <input class="form-control" name="fornecedor" value="{{ form_data.fornecedor }}"
+                     list="sugestoes-fornecedores" autocomplete="off" spellcheck="false" required>
+            </div>
+            <div class="col-4">
+              <label class="form-label">Número da nota *</label>
+              <input class="form-control" name="numero_nota" value="{{ form_data.numero_nota }}"
+                     list="sugestoes-notas-numeros" autocomplete="off" spellcheck="false" required>
+            </div>
+            <div class="col-3">
+              <label class="form-label">Série *</label>
+              <input class="form-control" name="serie" value="{{ form_data.serie }}"
+                     list="sugestoes-notas-series" autocomplete="off" spellcheck="false" required>
+            </div>
+          </div>
+          <button class="btn btn-primary mt-3">Registrar entrada</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header fw-bold">Últimas entradas</div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead>
+            <tr><th>Data</th><th>Item</th><th class="text-end">Qtd</th><th>Nota</th><th>Fornecedor</th><th>Val.</th><th class="text-end">Valor unit.</th><th class="text-end">Total</th><th>Usuário</th></tr>
+          </thead>
+          <tbody>
+            {% for mov in recentes %}
+            <tr>
+              <td class="text-nowrap">{{ formatar_data_hora(mov.data) }}</td>
+              <td>{{ mov.item.nome }}</td>
+              <td class="text-end">{{ mov.quantidade }}</td>
+              <td>{{ mov.nota_rotulo or '—' }}</td>
+              <td>{{ mov.fornecedor or '—' }}</td>
+              <td class="text-nowrap">{{ formatar_data(mov.validade) }}</td>
+              <td class="text-end text-nowrap">{{ formatar_moeda(mov.valor_unitario_cents) }}</td>
+              <td class="text-end text-nowrap">{{ formatar_moeda(mov.quantidade * (mov.valor_unitario_cents or 0)) }}</td>
+              <td>{{ mov.usuario.nome }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9" class="text-muted text-center py-4">Nenhuma entrada registrada ainda.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

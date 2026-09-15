@@ -1,0 +1,178 @@
+/* Tema profissional do sistema de estoque — bordas quadradas, paleta sóbria */
+
+:root {
+  /* Bordas quadradas em todo o sistema (cards, botões, inputs, badges…) */
+  --bs-border-radius: 0;
+  --bs-border-radius-sm: 0;
+  --bs-border-radius-lg: 0;
+  --bs-border-radius-xl: 0;
+  --bs-border-radius-2xl: 0;
+  --bs-border-radius-pill: 0;
+
+  /* Azul corporativo sóbrio no lugar do azul padrão */
+  --bs-primary: #1d6ab2;
+  --bs-primary-rgb: 29, 106, 178;
+  --bs-link-color: #1d6ab2;
+  --bs-link-color-rgb: 29, 106, 178;
+  --bs-link-hover-color: #1d6ab2;
+  --bs-link-hover-color-rgb: 29, 106, 178;
+}
+
+main.container {
+  max-width: 1400px;
+  margin-top: 1.5rem;
+}
+
+/* Barra superior escura com filete de destaque */
+.navbar-estoque {
+  background-color: #10151c;
+  border-bottom: 3px solid var(--bs-primary);
+}
+
+.navbar-brand {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.navbar-brand img {
+  max-height: 36px;
+  width: auto;
+  display: block;
+}
+
+/* Cartões planos: borda em vez de sombra */
+.card {
+  box-shadow: none;
+  border: 1px solid #d8dee4;
+}
+
+.card-header {
+  background-color: #f4f6f8;
+  border-bottom: 1px solid #d8dee4;
+}
+
+/* Cabeçalhos de tabela discretos, em caixa alta */
+.table thead th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #5c6b7a;
+  background-color: #f4f6f8;
+  border-bottom: 1px solid #d8dee4;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+/* Botões levemente firmes */
+.btn {
+  --bs-btn-font-weight: 500;
+}
+
+/* Botões primários — azul um pouco mais escuro */
+.btn-primary {
+  --bs-btn-bg: #1d6ab2;
+  --bs-btn-border-color: #1d6ab2;
+  --bs-btn-hover-bg: #1d6ab2;
+  --bs-btn-hover-border-color: #1d6ab2;
+  --bs-btn-active-bg: #1d6ab2;
+  --bs-btn-active-border-color: #1d6ab2;
+  --bs-btn-disabled-bg: #1d6ab2;
+  --bs-btn-disabled-border-color: #1d6ab2;
+}
+
+.btn-outline-primary {
+  --bs-btn-color: #1d6ab2;
+  --bs-btn-border-color: #1d6ab2;
+  --bs-btn-hover-bg: #1d6ab2;
+  --bs-btn-hover-border-color: #1d6ab2;
+  --bs-btn-active-bg: #1d6ab2;
+  --bs-btn-active-border-color: #1d6ab2;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-active-color: #fff;
+}
+
+/* Campo principal de leitura (caixa e entradas) — maior e legível */
+.input-leitura {
+  font-size: 1.3rem;
+  padding: 0.8rem 1rem;
+}
+
+/* Dropdown do autocomplete — fundo na cor do header, bordas quadradas */
+.autocomplete-lista {
+  position: fixed;
+  z-index: 2000;
+  background-color: #10151c; /* cor da barra superior */
+  border: 1px solid #31455c;
+  border-radius: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.autocomplete-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  color: #e8edf2;
+  cursor: pointer;
+  border-bottom: 1px solid #2a3d50;
+  font-size: 0.9rem;
+}
+
+.autocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.ativo {
+  background-color: #1f4e79; /* azul primário do tema */
+  color: #ffffff;
+}
+
+.autocomplete-nome {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.autocomplete-info {
+  color: #9fb2c4;
+  font-family: Consolas, Menlo, monospace;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.autocomplete-item:hover .autocomplete-info,
+.autocomplete-item.ativo .autocomplete-info {
+  color: #cfe0ee;
+}
+
+/* Inputs com borda mais definida */
+.form-control,
+.form-select {
+  border-color: #b9c4ce;
+}
+
+/* Rodapé discreto */
+.rodape {
+  border-top: 1px solid #d8dee4;
+  margin-top: 3rem;
+  padding: 1.25rem 0 2rem;
+  color: #77828e;
+  font-size: 0.82rem;
+}
+
+/* Utilitários do sistema */
+.item-inativo {
+  color: var(--bs-secondary-color);
+  text-decoration: line-through;
+}
+
+.codigo {
+  font-family: Consolas, Menlo, monospace;
+  font-size: 0.85rem;
+}

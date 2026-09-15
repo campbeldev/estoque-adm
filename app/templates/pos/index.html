@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% from "macros.html" import sugestoes_itens, sugestoes_valores %}
+{% set aba = 'pos' %}
+{% block titulo %}Saídas{% endblock %}
+
+{% macro destino_campos(obrigar_funcionario=false, obrigar_obra=false) %}
+<div class="row g-2">
+  <div class="col-7">
+    <input class="form-control" name="funcionario" {% if obrigar_funcionario %}required{% endif %}
+           placeholder="Funcionário (quem retira)…" list="sugestoes-funcionarios"
+           value="{{ funcionario_texto }}" autocomplete="off" spellcheck="false">
+  </div>
+  <div class="col-5">
+    <select class="form-select" name="obra_id" {% if obrigar_obra %}required{% endif %}>
+      <option value="">Obra (destino)…</option>
+      {% for o in obras %}
+      <option value="{{ o.id }}" {% if o.id == obra_id %}selected{% endif %}>{{ o.nome }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</div>
+{% endmacro %}
+
+{% block conteudo %}
+{{ sugestoes_valores(sugestoes_funcionarios, 'sugestoes-funcionarios') }}
+{% if not funcionarios or not obras %}
+<div class="alert alert-warning">
+  As saídas exigem funcionário e obra cadastrados — falta{% if not funcionarios and not obras %}m funcionários e obras{% elif not funcionarios %}m funcionários{% else %}m obras{% endif %}.
+  {% if usuario_atual.perfil == 'admin' %}
+  Cadastre agora:
+  <a href="{{ url_for('cadastros.funcionarios') }}">Funcionários</a> ·
+  <a href="{{ url_for('cadastros.obras') }}">Obras</a>
+  {% else %}
+  Peça ao administrador para cadastrá-los.
+  {% endif %}
+</div>
+{% endif %}
+<div class="row">
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header fw-bold">Leitura de código</div>
+      <div class="card-body">
+        {{ sugestoes_itens(autocomplete) }}
+        <form method="post" action="{{ url_for('pos.adicionar') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input class="form-control form-control-lg input-leitura mb-3" name="codigo" autofocus autocomplete="off"
+                 placeholder="Digite o nome do produto ou código" list="sugestoes-itens"
+                 spellcheck="false" required>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="modo_rapido" id="modo_rapido" {% if modo_rapido %}checked{% endif %}>
+            <label class="form-check-label" for="modo_rapido">
+              Modo rápido — baixa 1 unidade por leitura
+            </label>
+          </div>
+          {{ destino_campos(obrigar_funcionario=modo_rapido, obrigar_obra=modo_rapido) }}
+          <button class="btn btn-primary w-100 mt-3" type="submit">
+            {% if modo_rapido %}Registrar saída{% else %}Adicionar ao pacote{% endif %}
+          </button>
+        </form>
+        {% if sugestoes %}
+        <div class="small border-top pt-3 mt-3">
+          <div class="text-muted mb-1">Correspondências para "{{ request.args.get('buscar', '') }}":</div>
+          {% for s in sugestoes %}
+          <form method="post" action="{{ url_for('pos.adicionar') }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="codigo" value="{{ s.codigo }}">
+            <input type="hidden" name="modo_rapido" value="{% if modo_rapido %}on{% endif %}">
+            <input type="hidden" name="funcionario" value="{{ funcionario_texto }}">
+            <input type="hidden" name="obra_id" value="{{ obra_id if obra_id else '' }}">
+            <button class="btn btn-sm btn-outline-primary mb-1">{{ s.nome }}{% if s.tamanho %} · Tam. {{ s.tamanho }}{% endif %}</button>
+          </form>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header fw-bold d-flex justify-content-between">
+        <span>Pacote</span>
+        <span class="text-muted small">
+          {{ linhas|length }} {{ 'item aguardando' if linhas|length == 1 else 'itens aguardando' }} confirmação
+        </span>
+      </div>
+      <div class="card-body">
+        {% if linhas %}
+        <form method="post" action="{{ url_for('pos.finalizar') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="modo_rapido" value="{% if modo_rapido %}on{% endif %}">
+          <div class="table-responsive">
+            <table class="table align-middle mb-3">
+              <thead>
+                <tr>
+                  <th>Item</th><th class="text-end" style="width:90px">Qtd</th>
+                  <th class="text-end" style="width:80px">Saldo</th>
+                  <th class="text-end" style="width:100px">Valor estimado</th><th style="width:50px"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for linha in linhas %}
+                <tr>
+                  <td>
+                    {{ linha.item.nome }}
+                    <div class="text-muted small codigo">{{ linha.item.codigo }}</div>
+                    {% if linha.item.tamanho %}<span class="badge text-bg-secondary">Tam. {{ linha.item.tamanho }}</span>{% endif %}
+                  </td>
+                  <td>
+                    <input class="form-control form-control-sm text-end" type="number" min="0"
+                           name="qtd_{{ linha.item.id }}" value="{{ linha.qtd }}">
+                  </td>
+                  <td class="text-end {{ 'text-danger fw-bold' if linha.qtd > linha.saldo }}">{{ linha.saldo }}</td>
+                  <td class="text-end text-nowrap">
+                    {% if linha.custo is not none %}
+                    {{ formatar_moeda(linha.qtd * linha.custo) }}
+                    {% else %}—{% endif %}
+                  </td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-danger" title="Remover" formnovalidate
+                            formaction="{{ url_for('pos.remover', item_id=linha.item.id) }}">×</button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr class="fw-bold">
+                  <td colspan="3" class="text-end">Total estimado</td>
+                  <td class="text-end text-nowrap">{{ formatar_moeda(total_estimado) }}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          {{ destino_campos(obrigar_funcionario=true, obrigar_obra=true) }}
+          <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-outline-secondary" formaction="{{ url_for('pos.atualizar') }}" formnovalidate>Atualizar quantidades</button>
+            <button class="btn btn-success flex-grow-1 btn-lg">Confirmar saída</button>
+          </div>
+        </form>
+        {% else %}
+        <p class="text-muted text-center py-4 mb-0">
+          Pacote vazio.<br>Digite um código para adicionar itens.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

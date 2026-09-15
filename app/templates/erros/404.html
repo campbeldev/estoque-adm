@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block titulo %}Página não encontrada{% endblock %}
+{% block conteudo %}
+<div class="text-center mt-5">
+  <h1 class="display-4">404</h1>
+  <p class="lead">Página não encontrada.</p>
+  <a class="btn btn-primary" href="{{ url_for('auth.raiz') }}">Voltar ao início</a>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "macros.html" import sugestoes_valores %}
+{% set aba = 'cadastros' %}
+{% block titulo %}Obras{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">Obras</h1>
+  <a class="btn btn-primary" href="{{ url_for('cadastros.obra_nova') }}">+ Nova obra</a>
+</div>
+{{ sugestoes_valores(sugestoes_busca, 'sugestoes-busca-obra') }}
+<form class="row g-2 mb-3" method="get">
+  <div class="col-auto flex-grow-1">
+    <input class="form-control" name="busca" value="{{ busca }}" placeholder="Buscar por nome…"
+           list="sugestoes-busca-obra" autocomplete="off" spellcheck="false">
+  </div>
+  <div class="col-auto"><button class="btn btn-outline-secondary">Buscar</button></div>
+</form>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Obra</th><th>Situação</th><th></th></tr></thead>
+      <tbody>
+        {% for obra in obras %}
+        <tr>
+          <td class="{{ 'item-inativo' if not obra.ativo }}">{{ obra.nome }}</td>
+          <td>
+            {% if obra.ativo %}<span class="badge text-bg-success">Ativa</span>
+            {% else %}<span class="badge text-bg-secondary">Inativa</span>{% endif %}
+          </td>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('cadastros.obra_editar', obra_id=obra.id) }}">Editar</a>
+            <form class="d-inline" method="post" action="{{ url_for('cadastros.obra_desativar', obra_id=obra.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-{{ 'success' if not obra.ativo else 'danger' }}">
+                {{ 'Reativar' if not obra.ativo else 'Desativar' }}
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-muted text-center py-4">Nenhuma obra cadastrada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

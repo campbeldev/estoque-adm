@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% set aba = 'cadastros' %}
+{% block titulo %}Usuários{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">Usuários do sistema</h1>
+  <a class="btn btn-primary" href="{{ url_for('usuarios.novo') }}">+ Novo usuário</a>
+</div>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Situação</th><th></th></tr></thead>
+      <tbody>
+        {% for usuario in usuarios %}
+        <tr>
+          <td class="{{ 'item-inativo' if not usuario.ativo }}">{{ usuario.nome }}</td>
+          <td class="codigo">{{ usuario.login }}</td>
+          <td>
+            <span class="badge text-bg-{{ 'danger' if usuario.perfil == 'admin' else 'primary' }}">
+              {{ 'Admin' if usuario.perfil == 'admin' else 'Operador' }}
+            </span>
+          </td>
+          <td>
+            {% if usuario.ativo %}<span class="badge text-bg-success">Ativo</span>
+            {% else %}<span class="badge text-bg-secondary">Inativo</span>{% endif %}
+            {% if usuario.forcar_troca %}<span class="badge text-bg-warning">trocar senha</span>{% endif %}
+          </td>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('usuarios.editar', usuario_id=usuario.id) }}">Editar</a>
+            <form class="d-inline" method="post" action="{{ url_for('usuarios.resetar_senha', usuario_id=usuario.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-secondary">Resetar senha</button>
+            </form>
+            <form class="d-inline" method="post" action="{{ url_for('usuarios.desativar', usuario_id=usuario.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-{{ 'success' if not usuario.ativo else 'danger' }}" {% if usuario.id == usuario_atual.id %}disabled{% endif %}>
+                {{ 'Reativar' if not usuario.ativo else 'Desativar' }}
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "macros.html" import sugestoes_itens %}
+{% set aba = 'itens' %}
+{% block titulo %}Itens{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">Itens cadastrados</h1>
+  <a class="btn btn-primary" href="{{ url_for('itens.novo') }}">+ Novo item</a>
+</div>
+{{ sugestoes_itens(autocomplete) }}
+<form class="row g-2 mb-3" method="get">
+  <div class="col-auto flex-grow-1">
+    <input class="form-control" name="busca" value="{{ busca }}" list="sugestoes-itens"
+           placeholder="Buscar por nome ou código…" autocomplete="off" spellcheck="false">
+  </div>
+  <div class="col-auto"><button class="btn btn-outline-secondary">Buscar</button></div>
+</form>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Código</th><th>Item</th><th>Categoria</th><th>Un.</th>
+          <th class="text-end">Mínimo</th><th class="text-end">Saldo</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in itens %}
+        <tr>
+          <td class="codigo">{{ item.codigo }}</td>
+          <td>
+            <span class="{{ 'item-inativo' if not item.ativo }}">{{ item.nome }}</span>
+            {% if item.tamanho %}<span class="badge text-bg-secondary">Tam. {{ item.tamanho }}</span>{% endif %}
+            {% if item.ca %}<span class="badge text-bg-light">CA {{ item.ca }}</span>{% endif %}
+          </td>
+          <td>{{ item.categoria.nome }}</td>
+          <td>{{ UNIDADES[item.unidade] }}</td>
+          <td class="text-end">{{ item.estoque_minimo }}</td>
+          <td class="text-end fw-bold">{{ saldos.get(item.id, 0) }}</td>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('itens.editar', item_id=item.id) }}">Editar</a>
+            <form class="d-inline" method="post" action="{{ url_for('itens.desativar', item_id=item.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-{{ 'success' if not item.ativo else 'danger' }}">
+                {{ 'Reativar' if not item.ativo else 'Desativar' }}
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-muted text-center py-4">Nenhum item cadastrado ainda.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

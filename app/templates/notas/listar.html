@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% set aba = 'notas' %}
+{% block titulo %}Notas{% endblock %}
+{% block conteudo %}
+<h1 class="h4 mb-3">Notas de entrada</h1>
+<div class="d-flex justify-content-end mb-3">
+  <a class="btn btn-success" href="{{ url_for('notas.listar', exportar=1) }}">Exportar CSV</a>
+</div>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Data</th><th>Nota</th><th>Série</th><th>Fornecedor</th>
+          <th class="text-end">Itens</th><th class="text-end">Total</th><th>Usuário</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for nota in notas %}
+        {% set infos = totais.get(nota.id, {}) %}
+        <tr>
+          <td class="text-nowrap">{{ formatar_data_hora(nota.data) }}</td>
+          <td><a href="{{ url_for('notas.detalhe', nota_id=nota.id) }}">{{ nota.numero }}</a></td>
+          <td>{{ nota.serie or '—' }}</td>
+          <td>{{ nota.fornecedor }}</td>
+          <td class="text-end">{{ infos.get('itens', 0) }}</td>
+          <td class="text-end text-nowrap">{{ formatar_moeda(infos.get('total', 0)) }}</td>
+          <td>{{ nota.usuario.nome }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-muted text-center py-4">Nenhuma nota registrada ainda.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

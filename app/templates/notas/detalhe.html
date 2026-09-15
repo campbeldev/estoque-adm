@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% set aba = 'notas' %}
+{% block titulo %}Nota {{ nota.numero }}{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">
+    Nota {{ nota.numero }}{% if nota.serie %} <span class="text-muted">(série {{ nota.serie }})</span>{% endif %}
+  </h1>
+  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('notas.listar') }}">← Voltar</a>
+</div>
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row">
+      <div class="col-sm-4"><span class="text-muted">Fornecedor</span><br>{{ nota.fornecedor }}</div>
+      <div class="col-sm-4"><span class="text-muted">Registrada em</span><br>{{ formatar_data_hora(nota.data) }}</div>
+      <div class="col-sm-4"><span class="text-muted">Registrada por</span><br>{{ nota.usuario.nome }}</div>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Item</th><th class="text-end">Qtd</th><th>Un.</th>
+          <th>Validade</th><th class="text-end">Valor unit.</th><th class="text-end">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for mov in movs %}
+        <tr>
+          <td>{{ mov.item.nome }} <span class="text-muted small codigo">{{ mov.item.codigo }}</span></td>
+          <td class="text-end">{{ mov.quantidade }}</td>
+          <td>{{ UNIDADES[mov.item.unidade] }}</td>
+          <td class="text-nowrap">{{ formatar_data(mov.validade) }}</td>
+          <td class="text-end text-nowrap">{{ formatar_moeda(mov.valor_unitario_cents) }}</td>
+          <td class="text-end text-nowrap">{{ formatar_moeda(mov.quantidade * (mov.valor_unitario_cents or 0)) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-muted text-center py-4">Nenhum item vinculado a esta nota.</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if movs %}
+      <tfoot>
+        <tr class="table-light">
+          <th colspan="5" class="text-end">Total da nota</th>
+          <th class="text-end text-nowrap">{{ formatar_moeda(total) }}</th>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+{% endblock %}

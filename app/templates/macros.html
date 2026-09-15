@@ -1,0 +1,20 @@
+{% macro sugestoes_itens(itens) %}
+<datalist id="sugestoes-itens">
+  {% for nome, codigo in itens %}
+  <option value="{{ nome }}">{{ codigo }}</option>
+  <option value="{{ codigo }}">{{ nome }}</option>
+  {% endfor %}
+</datalist>
+{% endmacro %}
+
+{% macro sugestoes_valores(opcoes, id) %}
+<datalist id="{{ id }}">
+  {% for item in opcoes %}
+  {% if item is string %}
+  <option value="{{ item }}"></option>
+  {% else %}
+  <option value="{{ item[0] }}">{{ item[1] }}</option>
+  {% endif %}
+  {% endfor %}
+</datalist>
+{% endmacro %}

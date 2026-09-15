@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% from "macros.html" import sugestoes_itens %}
+{% set aba = 'relatorios' %}
+{% block titulo %}Relatórios{% endblock %}
+{% block conteudo %}
+<h1 class="h4 mb-3">Relatórios</h1>
+{% set vista = 'movimentacoes' %}
+{% include "relatorios/_abas.html" %}
+{{ sugestoes_itens(autocomplete) }}
+<form method="get" class="row g-2 mb-3 align-items-end">
+  <div class="col-auto">
+    <label class="form-label small">De</label>
+    <input class="form-control" type="date" name="data_inicio" value="{{ request.args.get('data_inicio', '') }}">
+  </div>
+  <div class="col-auto">
+    <label class="form-label small">Até</label>
+    <input class="form-control" type="date" name="data_fim" value="{{ request.args.get('data_fim', '') }}">
+  </div>
+  <div class="col-auto">
+    <label class="form-label small">Tipo</label>
+    <select class="form-select" name="tipo">
+      <option value="">Todos</option>
+      {% for valor, rotulo in TIPOS.items() %}
+      <option value="{{ valor }}" {% if request.args.get('tipo') == valor %}selected{% endif %}>{{ rotulo }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-auto">
+    <label class="form-label small">Item (nome ou código)</label>
+    <input class="form-control" name="item" value="{{ request.args.get('item', '') }}" list="sugestoes-itens"
+           autocomplete="off" spellcheck="false">
+  </div>
+  <div class="col-auto"><button class="btn btn-outline-secondary">Filtrar</button></div>
+  <div class="col-auto"><button class="btn btn-success" name="exportar" value="1">Exportar CSV</button></div>
+</form>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Data</th><th>Tipo</th><th>Item</th><th class="text-end">Qtd</th><th>Un.</th>
+          <th>Funcionário</th><th>Obra</th><th>Usuário</th><th>Fornecedor</th><th>Nota</th><th>Observação</th><th class="text-end">Valor total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for mov in movimentacoes %}
+        <tr>
+          <td class="text-nowrap">{{ formatar_data_hora(mov.data) }}</td>
+          <td>
+            {% if mov.tipo == 'entrada' %}<span class="badge text-bg-success">Entrada</span>
+            {% elif mov.tipo == 'saida' %}<span class="badge text-bg-danger">Saída</span>
+            {% else %}<span class="badge text-bg-warning">Ajuste</span>{% endif %}
+          </td>
+          <td>{{ mov.item.nome }}</td>
+          <td class="text-end">{{ mov.quantidade }}</td>
+          <td>{{ UNIDADES[mov.item.unidade] }}</td>
+          <td>{{ mov.funcionario.nome if mov.funcionario else '—' }}</td>
+          <td>{{ mov.obra.nome if mov.obra else '—' }}</td>
+          <td>{{ mov.usuario.nome }}</td>
+          <td>{{ mov.fornecedor or '—' }}</td>
+          <td>
+            {% if mov.nota %}
+            <a href="{{ url_for('notas.detalhe', nota_id=mov.nota.id) }}">{{ mov.nota_rotulo }}</a>
+            {% else %}
+            {{ mov.nota_rotulo or '—' }}
+            {% endif %}
+          </td>
+          <td class="small">{{ mov.observacao or '—' }}</td>
+          <td class="text-end text-nowrap">
+            {% if mov.valor_unitario_cents is not none %}
+            {{ formatar_moeda(mov.quantidade * mov.valor_unitario_cents) }}
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="12" class="text-muted text-center py-4">Nenhuma movimentação encontrada com esses filtros.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if movimentacoes|length == 1000 %}
+  <div class="card-footer text-muted small">
+    Mostrando os 1000 registros mais recentes — use os filtros ou exporte o CSV.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

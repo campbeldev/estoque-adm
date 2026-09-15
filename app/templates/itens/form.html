@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% set aba = 'itens' %}
+{% block titulo %}{{ 'Editar item' if item else 'Novo item' }}{% endblock %}
+{% block conteudo %}
+<h1 class="h4 mb-3">{{ 'Editar item' if item else 'Novo item' }}</h1>
+<div class="card">
+  <div class="card-body">
+    <form method="post" class="row g-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-6">
+        <label class="form-label">Nome do item *</label>
+        <input class="form-control" name="nome" value="{{ item.nome if item else '' }}"
+               autocomplete="off" spellcheck="false" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Categoria *</label>
+        <select class="form-select" name="categoria_id" required>
+          <option value="">Selecione…</option>
+          {% for categoria in categorias %}
+          <option value="{{ categoria.id }}" {% if item and item.categoria_id == categoria.id %}selected{% endif %}>{{ categoria.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Unidade *</label>
+        <select class="form-select" name="unidade" required>
+          <option value="un" {% if not item or item.unidade == 'un' %}selected{% endif %}>un (unidade)</option>
+          <option value="pc" {% if item and item.unidade == 'pc' %}selected{% endif %}>pç (peça/par)</option>
+          <option value="cx" {% if item and item.unidade == 'cx' %}selected{% endif %}>cx (caixa)</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Estoque mínimo</label>
+        <input class="form-control" type="number" min="0" name="estoque_minimo"
+               value="{{ item.estoque_minimo if item else 0 }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Tamanho (uniformes)</label>
+        <select class="form-select" name="tamanho">
+          <option value="">—</option>
+          {% for tamanho in tamanhos %}
+          <option value="{{ tamanho }}" {% if item and item.tamanho == tamanho %}selected{% endif %}>{{ tamanho }}</option>
+          {% endfor %}
+          {% if item and item.tamanho and item.tamanho not in tamanhos %}
+          <option value="{{ item.tamanho }}" selected>{{ item.tamanho }}</option>
+          {% endif %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" title="Certificado de Aprovação">CA (EPIs)</label>
+        <input class="form-control" name="ca" value="{{ item.ca if item else '' }}"
+               autocomplete="off" spellcheck="false">
+        <div class="form-text">Obrigatório para itens da categoria EPI.</div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Código</label>
+        <input class="form-control codigo" name="codigo"
+               value="{{ item.codigo if item else '' }}" placeholder="vazio = gerar EV…"
+               autocomplete="off" spellcheck="false">
+        <div class="form-text">Deixe em branco para gerar automaticamente.</div>
+      </div>
+      <div class="col-12">
+        <button class="btn btn-primary">Salvar</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('itens.listar') }}">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

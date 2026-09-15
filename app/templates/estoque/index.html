@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% from "macros.html" import sugestoes_itens %}
+{% set aba = 'estoque' %}
+{% block titulo %}Estoque{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">Estoque atual</h1>
+  {% if usuario_atual.perfil == 'admin' %}
+  <a class="btn btn-outline-primary" href="{{ url_for('estoque.ajuste') }}">Ajuste (balanço)</a>
+  {% endif %}
+</div>
+{{ sugestoes_itens(autocomplete) }}
+<form class="row g-2 mb-3" method="get">
+  <div class="col-auto flex-grow-1">
+    <input class="form-control" name="busca" value="{{ busca }}" list="sugestoes-itens"
+           placeholder="Buscar por nome ou código…" autocomplete="off" spellcheck="false">
+  </div>
+  <div class="col-auto"><button class="btn btn-outline-secondary">Buscar</button></div>
+</form>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Código</th><th>Item</th><th>Categoria</th><th>Un.</th>
+          <th class="text-end">Saldo</th><th class="text-end">Mínimo</th>
+          <th>Vencimentos</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in itens %}
+        {% set saldo = saldos.get(item.id, 0) %}
+        {% set info_lotes = lotes.get(item.id) %}
+        <tr>
+          <td class="codigo">{{ item.codigo }}</td>
+          <td>
+            <span class="{{ 'item-inativo' if not item.ativo }}">{{ item.nome }}</span>
+            {% if item.tamanho %}<span class="badge text-bg-secondary">Tam. {{ item.tamanho }}</span>{% endif %}
+          </td>
+          <td>{{ item.categoria.nome }}</td>
+          <td>{{ UNIDADES[item.unidade] }}</td>
+          <td class="text-end fw-bold {{ 'text-danger' if saldo == 0 and item.ativo }}">{{ saldo }}</td>
+          <td class="text-end">{{ item.estoque_minimo }}</td>
+          <td class="text-nowrap">
+            {% if info_lotes %}
+            {% for lote in info_lotes.lotes %}
+            {% set dias = (lote.validade - hoje).days %}
+            <span class="badge text-bg-{{ 'danger' if lote.validade < hoje else ('warning' if dias <= dias_alerta else 'light') }}">
+              {{ lote.qtd }} × {{ formatar_data(lote.validade) }}
+            </span>
+            {% endfor %}
+            {% if info_lotes.sem_validade %}
+            <span class="badge text-bg-light" title="Unidades sem data de validade (ajustes/entradas antigas)">
+              {{ info_lotes.sem_validade }} s/ validade
+            </span>
+            {% endif %}
+            {% endif %}
+          </td>
+          <td>
+            {% if not item.ativo %}
+              <span class="badge text-bg-secondary">Inativo</span>
+            {% elif vencidos.get(item.id) %}
+              <span class="badge text-bg-danger">VENCIDO</span>
+            {% elif saldo <= item.estoque_minimo %}
+              <span class="badge text-bg-warning">ESTOQUE BAIXO</span>
+            {% else %}
+              <span class="badge text-bg-success">OK</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-muted text-center py-4">Nenhum item cadastrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
