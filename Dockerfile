@@ -15,4 +15,6 @@ COPY scripts/ ./scripts/
 
 EXPOSE 5050
 
-CMD ["gunicorn", "-b", "0.0.0.0:5050", "--workers", "2", "--threads", "4", "app:create_app()"]
+# Um único worker: `db.create_all()` roda no boot e, com dois workers, ambos
+# disputariam a criação do schema no banco vazio (corrida → UniqueViolation).
+CMD ["gunicorn", "-b", "0.0.0.0:5050", "--workers", "1", "--threads", "4", "app:create_app()"]
