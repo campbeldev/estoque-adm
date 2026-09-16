@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% set aba = 'logistica' %}
+{% block titulo %}Rastreio{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">Rastreio de entregas</h1>
+</div>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-auto">
+    <select class="form-select" name="status" onchange="this.form.submit()" aria-label="Filtrar por situação">
+      <option value="">Todas</option>
+      {% for valor, info in STATUS.items() %}
+      <option value="{{ valor }}" {% if valor == status_filtro %}selected{% endif %}>{{ info.rotulo }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Obra</th>
+          <th>Setor</th>
+          <th>Transportador</th>
+          <th>Despachada em</th>
+          <th>Situação</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for remessa in remessas %}
+        <tr>
+          <td class="codigo">{{ remessa.codigo }}</td>
+          <td>{{ remessa.obra.nome }}</td>
+          <td>{{ remessa.setor.nome }}</td>
+          <td>{{ remessa.transportador.nome }}</td>
+          <td class="text-nowrap">{{ formatar_data_hora(remessa.data_criacao) }}</td>
+          <td><span class="badge {{ STATUS[remessa.status].badge }}">{{ STATUS[remessa.status].rotulo }}</span></td>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('logistica.detalhe', remessa_id=remessa.id) }}">Rastrear</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-4">Nenhuma remessa{% if status_filtro %} com este status{% endif %}.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

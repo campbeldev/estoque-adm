@@ -128,8 +128,8 @@ def nova():
         if valor_unitario is None or valor_unitario <= 0:
             return _render("Valor unitário inválido — use o formato 12,50.")
 
-        # Validade do lote que está chegando — obrigatória para EPIs,
-        # opcional para os demais (uniforme, ferramenta etc.).
+        # Validade do lote que está chegando (opcional — nem todo material
+        # de escritório/limpeza/alojamento tem vencimento).
         validade_str = form_data["validade"]
         if validade_str:
             try:
@@ -138,8 +138,6 @@ def nova():
                 return _render("Data de validade inválida.")
         else:
             validade = None
-        if item.categoria.nome == "EPI" and validade is None:
-            return _render("Itens de EPI exigem a data de validade do lote.")
 
         if form_data["data"]:
             try:

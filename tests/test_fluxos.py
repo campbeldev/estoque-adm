@@ -1,10 +1,8 @@
 """Testes de fluxo do sistema (smoke tests) com banco SQLite temporário."""
 import base64
 import os
-import re
 import tempfile
 import unittest
-import zlib
 from datetime import date
 
 from werkzeug.security import generate_password_hash
@@ -12,11 +10,14 @@ from werkzeug.security import generate_password_hash
 from app import create_app, db
 from app.models import (
     Categoria,
-    Funcionario,
+    Entregador,
+    EventoRemessa,
     Item,
     Movimentacao,
     Nota,
     Obra,
+    Remessa,
+    Setor,
     Usuario,
     saldo_do_item,
     saldos_por_lote,
@@ -29,6 +30,7 @@ class BaseTeste(unittest.TestCase):
         os.close(fd)
         os.unlink(self.caminho_banco)  # o SQLAlchemy cria o arquivo sozinho
         self.pasta_backup = tempfile.mkdtemp()
+        self.pasta_comprovantes = tempfile.mkdtemp()
 
         self.app = create_app(
             {
@@ -38,12 +40,13 @@ class BaseTeste(unittest.TestCase):
                 + self.caminho_banco.replace(os.sep, "/"),
                 "ESTOQUE_DB_PATH": self.caminho_banco,
                 "BACKUP_DIR": self.pasta_backup,
+                "COMPROVANTES_DIR": self.pasta_comprovantes,
                 "WTF_CSRF_ENABLED": False,
             }
         )
         with self.app.app_context():
             db.create_all()
-            db.session.add(Categoria(nome="EPI"))
+            db.session.add(Categoria(nome="Material de Escritório"))
             db.session.add(
                 Usuario(
                     login="admin",
@@ -102,7 +105,7 @@ class BaseTeste(unittest.TestCase):
             "numero_nota": "NF-0001",
             "serie": "1",
             "valor_unitario": "12,50",
-            "validade": "2030-06-15",  # EPI exige validade do lote na entrada
+            "validade": "2030-06-15",  # validade do lote (opcional)
             "data": "",
         }
         dados.update(extras)
@@ -161,18 +164,16 @@ class TesteItens(BaseTeste):
         self.cliente.post(
             "/itens/novo",
             data={
-                "nome": "Luva de Raspa",
-                "categoria_id": 1,  # EPI — exige CA
+                "nome": "Papel Sulfite A4",
+                "categoria_id": 1,
                 "unidade": "pc",
                 "estoque_minimo": 20,
                 "codigo": "",
-                "tamanho": "",
-                "ca": "12345",
             },
             follow_redirects=True,
         )
         with self.app.app_context():
-            item = Item.query.filter_by(nome="Luva de Raspa").first()
+            item = Item.query.filter_by(nome="Papel Sulfite A4").first()
             self.assertIsNotNone(item)
             self.assertEqual(item.codigo, f"EV{item.id:06d}")
 
@@ -187,115 +188,80 @@ class TesteItens(BaseTeste):
                 "unidade": "un",
                 "estoque_minimo": 0,
                 "codigo": codigo,
-                "tamanho": "",
-                "ca": "12345",
             },
             follow_redirects=True,
         )
         with self.app.app_context():
             self.assertEqual(Item.query.count(), 1)
 
-    def test_epi_exige_ca(self):
+
+class TesteEntregadores(BaseTeste):
+    def test_nome_obrigatorio(self):
         self.logar()
         resposta = self.cliente.post(
-            "/itens/novo",
-            data={
-                "nome": "Capacete de Segurança",
-                "categoria_id": 1,  # EPI
-                "unidade": "un",
-                "estoque_minimo": 0,
-                "codigo": "",
-                "tamanho": "",
-                "ca": "",
-            },
+            "/entregadores/novo",
+            data={"nome": "", "contato": ""},
             follow_redirects=True,
         )
-        self.assertIn("Itens de EPI exigem o CA".encode(), resposta.data)
+        self.assertIn("Informe o nome do entregador".encode(), resposta.data)
         with self.app.app_context():
-            self.assertEqual(Item.query.count(), 0)
+            self.assertEqual(Entregador.query.count(), 0)
 
-
-class TesteFuncionarios(BaseTeste):
-    def test_empresa_obrigatoria(self):
+    def test_criar_entregador_sem_contato(self):
         self.logar()
         resposta = self.cliente.post(
-            "/funcionarios/novo",
-            data={"nome": "Sem Empresa", "matricula": "M1", "empresa": "", "cargo": ""},
+            "/entregadores/novo",
+            data={"nome": "Carlos Motorista", "contato": ""},
             follow_redirects=True,
         )
-        self.assertIn("Informe a empresa".encode(), resposta.data)
+        self.assertIn("Entregador criado".encode(), resposta.data)
         with self.app.app_context():
-            self.assertEqual(Funcionario.query.count(), 0)
+            entregador = Entregador.query.first()
+            self.assertEqual(entregador.nome, "Carlos Motorista")
+            self.assertIsNone(entregador.contato)
 
-    def test_matricula_obrigatoria(self):
-        self.logar()
-        resposta = self.cliente.post(
-            "/funcionarios/novo",
-            data={"nome": "Sem Matrícula", "matricula": "", "empresa": "Alfa", "cargo": ""},
-            follow_redirects=True,
-        )
-        self.assertIn("Informe a matrícula".encode(), resposta.data)
-        with self.app.app_context():
-            self.assertEqual(Funcionario.query.count(), 0)
-
-    def test_matricula_duplicada_rejeitada_mesma_empresa(self):
+    def test_desativar_e_reativar(self):
         self.logar()
         self.cliente.post(
-            "/funcionarios/novo",
-            data={"nome": "João", "matricula": "001", "empresa": "Alfa", "cargo": "Pedreiro"},
+            "/entregadores/novo",
+            data={"nome": "Carlos Motorista", "contato": "(11) 99999-0000"},
         )
-        resposta = self.cliente.post(
-            "/funcionarios/novo",
-            data={"nome": "Maria", "matricula": "001", "empresa": "Alfa", "cargo": "Engenheira"},
-            follow_redirects=True,
-        )
-        self.assertIn(
-            "Já existe um funcionário com esta matrícula nesta empresa".encode(),
-            resposta.data,
-        )
+        self.cliente.post("/entregadores/1/desativar", follow_redirects=True)
         with self.app.app_context():
-            self.assertEqual(Funcionario.query.count(), 1)
-
-    def test_matricula_repetida_em_empresa_diferente_permitida(self):
-        self.logar()
-        self.cliente.post(
-            "/funcionarios/novo",
-            data={"nome": "João", "matricula": "001", "empresa": "Alfa", "cargo": "Pedreiro"},
-        )
-        resposta = self.cliente.post(
-            "/funcionarios/novo",
-            data={"nome": "Maria", "matricula": "001", "empresa": "Beta", "cargo": "Engenheira"},
-            follow_redirects=True,
-        )
-        self.assertIn("Funcionário criado: Maria".encode(), resposta.data)
+            self.assertFalse(Entregador.query.first().ativo)
+        self.cliente.post("/entregadores/1/desativar", follow_redirects=True)
         with self.app.app_context():
-            self.assertEqual(Funcionario.query.count(), 2)
+            self.assertTrue(Entregador.query.first().ativo)
 
-    def test_cargo_obrigatorio(self):
+
+class TesteSetores(BaseTeste):
+    def test_nome_obrigatorio(self):
         self.logar()
         resposta = self.cliente.post(
-            "/funcionarios/novo",
-            data={"nome": "Sem Cargo", "matricula": "M1", "empresa": "Alfa", "cargo": ""},
-            follow_redirects=True,
+            "/setores/novo", data={"nome": ""}, follow_redirects=True
         )
-        self.assertIn("Informe o cargo".encode(), resposta.data)
+        self.assertIn("Informe o nome do setor".encode(), resposta.data)
         with self.app.app_context():
-            self.assertEqual(Funcionario.query.count(), 0)
+            self.assertEqual(Setor.query.count(), 0)
 
-    def test_criar_funcionario_com_empresa_e_cargo(self):
+    def test_nome_duplicado_rejeitado(self):
+        self.logar()
+        self.cliente.post("/setores/novo", data={"nome": "Escritório"})
+        resposta = self.cliente.post(
+            "/setores/novo", data={"nome": "Escritório"}, follow_redirects=True
+        )
+        self.assertIn("Já existe um setor".encode(), resposta.data)
+        with self.app.app_context():
+            self.assertEqual(Setor.query.count(), 1)
+
+    def test_criar_setor(self):
         self.logar()
         resposta = self.cliente.post(
-            "/funcionarios/novo",
-            data={"nome": "João", "matricula": "001", "empresa": "Construtora Alfa",
-                  "cargo": "Pedreiro"},
-            follow_redirects=True,
+            "/setores/novo", data={"nome": "Alojamento"}, follow_redirects=True
         )
-        self.assertIn("Funcionário criado".encode(), resposta.data)
+        self.assertIn("Setor criado".encode(), resposta.data)
         with self.app.app_context():
-            funcionario = Funcionario.query.first()
-            self.assertEqual(funcionario.empresa, "Construtora Alfa")
-            self.assertEqual(funcionario.matricula, "001")
-            self.assertEqual(funcionario.cargo, "Pedreiro")
+            self.assertEqual(Setor.query.first().nome, "Alojamento")
 
 
 class TesteObras(BaseTeste):
@@ -368,12 +334,9 @@ class TestePos(BaseTeste):
     def setUp(self):
         super().setUp()
         with self.app.app_context():
+            db.session.add(Setor(nome="Escritório"))
             db.session.add(
-                Funcionario(
-                    nome="João da Silva",
-                    matricula="001",
-                    empresa="Construtora Alfa",
-                )
+                Entregador(nome="Carlos Motorista", contato="(11) 99999-0000")
             )
             db.session.add(Obra(nome="Obra Central"))
             db.session.commit()
@@ -394,7 +357,7 @@ class TestePos(BaseTeste):
 
         resposta = self.cliente.post(
             "/pos/finalizar",
-            data={"funcionario": "João da Silva", "obra_id": 1, "modo_rapido": ""},
+            data={"obra_id": 1, "setor_id": 1, "entregador_id": 1, "modo_rapido": ""},
             follow_redirects=True,
         )
         self.assertIn("Saída registrada".encode(), resposta.data)
@@ -402,10 +365,17 @@ class TestePos(BaseTeste):
             self.assertEqual(saldo_do_item(1), 7)
             mov = Movimentacao.query.filter_by(tipo="saida").first()
             self.assertEqual(mov.quantidade, 3)
-            self.assertEqual(mov.funcionario_id, 1)
+            self.assertEqual(mov.obra_id, 1)
+            self.assertEqual(mov.setor_id, 1)
+            self.assertIsNotNone(mov.remessa_id)
             self.assertEqual(mov.usuario.login, "operador")
             # a saída carrega o custo médio da entrada (12,50)
             self.assertEqual(mov.valor_unitario_cents, 1250)
+            # obra não-sede cria a remessa com o evento "despachada"
+            remessa = Remessa.query.first()
+            self.assertEqual(remessa.obra_id, 1)
+            self.assertEqual(remessa.transportador_id, 1)
+            self.assertEqual(remessa.status, "despachada")
 
     def test_finalizar_bloqueia_saldo_insuficiente(self):
         self.logar(login="operador")
@@ -418,7 +388,7 @@ class TestePos(BaseTeste):
         )
         resposta = self.cliente.post(
             "/pos/finalizar",
-            data={"funcionario": "João da Silva", "obra_id": 1, "modo_rapido": ""},
+            data={"obra_id": 1, "setor_id": 1, "entregador_id": 1, "modo_rapido": ""},
             follow_redirects=True,
         )
         self.assertIn(b"Saldo insuficiente", resposta.data)
@@ -432,7 +402,7 @@ class TestePos(BaseTeste):
 
         resposta = self.cliente.post(
             "/pos/adicionar",
-            data={"codigo": codigo, "modo_rapido": "on", "funcionario": "João da Silva", "obra_id": 1},
+            data={"codigo": codigo, "modo_rapido": "on", "obra_id": 1, "setor_id": 1, "entregador_id": 1},
             follow_redirects=True,
         )
         self.assertIn("Saída registrada".encode(), resposta.data)
@@ -441,29 +411,173 @@ class TestePos(BaseTeste):
             saida = Movimentacao.query.filter_by(tipo="saida").first()
             self.assertEqual(saida.valor_unitario_cents, 1250)
 
-    def test_finalizar_funcionario_ambiguo_bloqueia(self):
+    def test_finalizar_sem_entregador_para_obra_nao_sede_bloqueia(self):
         self.logar(login="operador")
-        with self.app.app_context():
-            db.session.add(
-                Funcionario(
-                    nome="Maria Souza",
-                    matricula="001",  # mesma matrícula em outra empresa
-                    empresa="Engenharia Beta",
-                    cargo="Engenheira",
-                )
-            )
-            db.session.commit()
         _, codigo = self.criar_item()
         self.dar_entrada(codigo=codigo, quantidade=5)
         self.cliente.post("/pos/adicionar", data={"codigo": codigo})
         resposta = self.cliente.post(
             "/pos/finalizar",
-            data={"funcionario": "001", "obra_id": 1, "modo_rapido": ""},
+            data={"obra_id": 1, "setor_id": 1, "entregador_id": "", "modo_rapido": ""},
             follow_redirects=True,
         )
-        self.assertIn(b"V\xc3\xa1rios funcion\xc3\xa1rios", resposta.data)
+        self.assertIn(b"informe quem transporta", resposta.data)
         with self.app.app_context():
             self.assertEqual(Movimentacao.query.filter_by(tipo="saida").count(), 0)
+            self.assertEqual(Remessa.query.count(), 0)
+
+    def test_saida_para_sede_nao_cria_remessa(self):
+        self.logar(login="operador")
+        with self.app.app_context():
+            db.session.add(Obra(nome="Sede", eh_sede=True))
+            db.session.commit()
+        _, codigo = self.criar_item()
+        self.dar_entrada(codigo=codigo, quantidade=5)
+        resposta = self.cliente.post(
+            "/pos/adicionar",
+            data={"codigo": codigo, "modo_rapido": "on", "obra_id": 2, "setor_id": 1, "entregador_id": ""},
+            follow_redirects=True,
+        )
+        self.assertIn("Saída registrada".encode(), resposta.data)
+        with self.app.app_context():
+            mov = Movimentacao.query.filter_by(tipo="saida").first()
+            self.assertIsNone(mov.remessa_id)
+            self.assertEqual(mov.obra_id, 2)
+            self.assertEqual(Remessa.query.count(), 0)
+
+
+class TesteLogistica(BaseTeste):
+    def setUp(self):
+        super().setUp()
+        with self.app.app_context():
+            db.session.add(Setor(nome="Escritório"))
+            db.session.add(
+                Entregador(nome="Carlos Motorista", contato="(11) 99999-0000")
+            )
+            db.session.add(Obra(nome="Obra Central"))
+            db.session.commit()
+
+    def _despachar(self):
+        """Saída para obra não-sede: cria uma remessa em trânsito."""
+        self.logar(login="operador")
+        _, codigo = self.criar_item()
+        self.dar_entrada(codigo=codigo, quantidade=5)
+        self.cliente.post(
+            "/pos/adicionar",
+            data={
+                "codigo": codigo,
+                "modo_rapido": "on",
+                "obra_id": 1,
+                "setor_id": 1,
+                "entregador_id": 1,
+            },
+            follow_redirects=True,
+        )
+
+    def test_lista_mostra_remessa_em_transito(self):
+        self._despachar()
+        resposta = self.cliente.get("/logistica/")
+        self.assertEqual(resposta.status_code, 200)
+        self.assertIn("RM000001".encode(), resposta.data)
+        self.assertIn("Em trânsito".encode(), resposta.data)
+        self.assertIn("Carlos Motorista".encode(), resposta.data)
+
+    def test_detalhe_mostra_timeline(self):
+        self._despachar()
+        resposta = self.cliente.get("/logistica/1")
+        self.assertEqual(resposta.status_code, 200)
+        self.assertIn("Despachada".encode(), resposta.data)
+        self.assertIn("Aguardando".encode(), resposta.data)
+        self.assertIn("Obra Central".encode(), resposta.data)
+        self.assertIn("Escritório".encode(), resposta.data)
+
+    def test_operador_acessa_rastreio(self):
+        self._despachar()
+        self.assertEqual(self.cliente.get("/logistica/").status_code, 200)
+        self.assertEqual(self.cliente.get("/logistica/1").status_code, 200)
+
+    def test_remessa_inexistente_404(self):
+        self.logar(login="operador")
+        self.assertEqual(self.cliente.get("/logistica/999").status_code, 404)
+
+    def _assinatura(self, conteudo=b"assinatura-de-teste"):
+        return "data:image/png;base64," + base64.b64encode(conteudo).decode()
+
+    def test_receber_mostra_formulario(self):
+        self._despachar()
+        resposta = self.cliente.get("/logistica/1/receber")
+        self.assertEqual(resposta.status_code, 200)
+        self.assertIn("Recebido por".encode(), resposta.data)
+        self.assertIn("canvas-assinatura".encode(), resposta.data)
+
+    def test_concluir_recebimento(self):
+        self._despachar()
+        resposta = self.cliente.post(
+            "/logistica/1/receber",
+            data={"recebido_por": "João da Obra", "assinatura": self._assinatura()},
+            follow_redirects=True,
+        )
+        self.assertIn("Entrega registrada".encode(), resposta.data)
+        with self.app.app_context():
+            remessa = Remessa.query.first()
+            self.assertEqual(remessa.status, "recebida")
+            self.assertEqual(remessa.recebido_por, "João da Obra")
+            self.assertEqual(remessa.comprovante_tipo, "assinatura")
+            self.assertIsNotNone(remessa.data_recebimento)
+            self.assertEqual(remessa.eventos[-1].tipo, "recebida")
+            nome_arquivo = remessa.comprovante_arq
+        self.assertTrue(
+            os.path.exists(os.path.join(self.pasta_comprovantes, nome_arquivo))
+        )
+
+    def test_comprovante_serve_arquivo(self):
+        self._despachar()
+        self.cliente.post(
+            "/logistica/1/receber",
+            data={"recebido_por": "João da Obra", "assinatura": self._assinatura()},
+        )
+        resposta = self.cliente.get("/logistica/1/comprovante/assinatura")
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.data, b"assinatura-de-teste")
+        # sem foto, a rota da foto responde 404
+        self.assertEqual(
+            self.cliente.get("/logistica/1/comprovante/foto").status_code, 404
+        )
+
+    def test_recebimento_sem_assinatura_bloqueia(self):
+        self._despachar()
+        resposta = self.cliente.post(
+            "/logistica/1/receber",
+            data={"recebido_por": "João da Obra", "assinatura": ""},
+            follow_redirects=True,
+        )
+        self.assertIn("Assine".encode(), resposta.data)
+        with self.app.app_context():
+            remessa = Remessa.query.first()
+            self.assertEqual(remessa.status, "despachada")
+            self.assertEqual(remessa.eventos[-1].tipo, "despachada")
+
+    def test_recebimento_sem_recebedor_bloqueia(self):
+        self._despachar()
+        resposta = self.cliente.post(
+            "/logistica/1/receber",
+            data={"recebido_por": "", "assinatura": self._assinatura()},
+            follow_redirects=True,
+        )
+        self.assertIn("Informe quem recebeu".encode(), resposta.data)
+        with self.app.app_context():
+            self.assertEqual(Remessa.query.first().status, "despachada")
+
+    def test_receber_em_remessa_ja_recebida_redireciona(self):
+        self._despachar()
+        self.cliente.post(
+            "/logistica/1/receber",
+            data={"recebido_por": "João da Obra", "assinatura": self._assinatura()},
+        )
+        resposta = self.cliente.get("/logistica/1/receber", follow_redirects=True)
+        self.assertIn("já foi concluída".encode(), resposta.data)
+        with self.app.app_context():
+            self.assertEqual(Remessa.query.first().status, "recebida")
 
 
 class TesteBuscaPorNome(BaseTeste):
@@ -749,74 +863,7 @@ class TesteMigracao(BaseTeste):
                 db.engine.dispose()
 
 
-class TesteTamanhoNaBusca(BaseTeste):
-    def _criar_com_tamanho(self, nome="Camisa Azul", tamanho="P"):
-        with self.app.app_context():
-            categoria = Categoria.query.first()
-            item = Item(
-                nome=nome, categoria_id=categoria.id, unidade="un",
-                estoque_minimo=0, codigo="", tamanho=tamanho,
-            )
-            db.session.add(item)
-            db.session.flush()
-            item.codigo = f"EV{item.id:06d}"
-            db.session.commit()
-            return item.id, item.codigo
-
-    def test_autocomplete_exibe_nome_com_tamanho(self):
-        self.logar()
-        self._criar_com_tamanho()
-        resposta = self.cliente.get("/estoque/")
-        self.assertIn(b'value="Camisa Azul P"', resposta.data)
-
-    def test_entrada_pelo_nome_com_tamanho(self):
-        self.logar()
-        self._criar_com_tamanho()
-        resposta = self.cliente.post(
-            "/entradas/",
-            data={
-                "codigo": "Camisa Azul P",
-                "item_id": "",
-                "quantidade": 2,
-                "fornecedor": "Fornecedor X",
-                "numero_nota": "NF-0009",
-                "serie": "1",
-                "valor_unitario": "45,00",
-                "validade": "2030-06-15",
-                "data": "",
-            },
-            follow_redirects=True,
-        )
-        self.assertIn("Entrada registrada: Camisa Azul".encode(), resposta.data)
-        with self.app.app_context():
-            self.assertEqual(saldo_do_item(1), 2)
-
-    def test_busca_no_estoque_com_tamanho(self):
-        self.logar()
-        self._criar_com_tamanho()
-        resposta = self.cliente.get(
-            "/estoque/", query_string={"busca": "Camisa Azul P"}
-        )
-        self.assertIn(b"Camisa Azul", resposta.data)
-        # a busca só pelo nome continua funcionando
-        resposta = self.cliente.get(
-            "/estoque/", query_string={"busca": "Camisa Azul"}
-        )
-        self.assertIn(b"Camisa Azul", resposta.data)
-
-
 class TesteValidade(BaseTeste):
-    def test_entrada_epi_sem_validade_bloqueia(self):
-        """A validade é do lote: EPI sem validade na entrada é recusado."""
-        self.logar()
-        self.criar_item()
-        resposta = self.dar_entrada(item_id=1, validade="")
-        self.assertIn(
-            "exigem a data de validade do lote".encode(), resposta.data
-        )
-        with self.app.app_context():
-            self.assertEqual(Movimentacao.query.count(), 0)
-
     def test_entrada_com_validade_explicita(self):
         self.logar()
         self.criar_item()
@@ -888,7 +935,7 @@ class TesteUI(BaseTeste):
         )
         self.assertIn(b'list="sugestoes-itens"', resposta.data)
         resposta = self.cliente.get("/estoque/")
-        # busca de tamanho normal, com autocomplete
+        # busca por nome/código, com autocomplete
         self.assertIn(b'class="form-control" name="busca"', resposta.data)
         self.assertIn(b'<datalist id="sugestoes-itens"', resposta.data)
 
@@ -903,10 +950,10 @@ class TesteUI(BaseTeste):
         self.logar()
         resposta = self.cliente.get("/entradas/")
         self.assertIn(b'list="sugestoes-fornecedores"', resposta.data)
-        resposta = self.cliente.get("/funcionarios/novo")
-        self.assertIn(b'list="sugestoes-f-empresas"', resposta.data)
-        resposta = self.cliente.get("/funcionarios")
-        self.assertIn(b'list="sugestoes-busca-f"', resposta.data)
+        resposta = self.cliente.get("/entregadores")
+        self.assertIn(b'list="sugestoes-busca-entregador"', resposta.data)
+        resposta = self.cliente.get("/setores")
+        self.assertIn(b'list="sugestoes-busca-setor"', resposta.data)
         resposta = self.cliente.get("/obras")
         self.assertIn(b'list="sugestoes-busca-obra"', resposta.data)
         resposta = self.cliente.get("/estoque/ajuste")
@@ -931,106 +978,10 @@ class TesteUI(BaseTeste):
         self.assertNotIn(b"list=", resposta.data)
         resposta = self.cliente.get("/usuarios/novo")
         self.assertNotIn(b"list=", resposta.data)
-        resposta = self.cliente.get("/funcionarios/novo")
-        self.assertNotIn(b'sugestoes-f-matriculas', resposta.data)
-
-
-class TesteRelatorioPorFuncionario(BaseTeste):
-    def setUp(self):
-        super().setUp()
-        with self.app.app_context():
-            db.session.add(
-                Funcionario(
-                    nome="João da Silva",
-                    matricula="001",
-                    empresa="Construtora Alfa",
-                    cargo="Pedreiro",
-                )
-            )
-            db.session.add(Obra(nome="Obra Central"))
-            db.session.commit()
-
-    @staticmethod
-    def _conteudo_dos_streams(pdf_bytes):
-        """Descomprime os streams de conteúdo do PDF (A85 + Flate, ou só Flate)."""
-        conteudo = b""
-        for trecho in re.findall(rb"stream\r?\n(.*?)endstream", pdf_bytes, re.S):
-            dados = trecho.strip()
-            try:
-                dados = base64.a85decode(dados, adobe=True)
-            except ValueError:
-                pass  # stream só com Flate
-            try:
-                conteudo += zlib.decompress(dados)
-            except zlib.error:
-                pass
-        return conteudo
-
-    def _fazer_retirada(self, codigo):
-        self.dar_entrada(codigo=codigo, quantidade=5)
-        self.cliente.post("/pos/adicionar", data={"codigo": codigo})
-        self.cliente.post(
-            "/pos/finalizar",
-            data={"funcionario": "João da Silva", "obra_id": 1, "modo_rapido": ""},
-        )
-
-    def test_retiradas_do_funcionario(self):
-        self.logar()
-        _, codigo = self.criar_item("Capacete de Segurança")
-        self._fazer_retirada(codigo)
-        resposta = self.cliente.get("/relatorios/por-funcionario?funcionario=001")
-        self.assertIn("João da Silva".encode(), resposta.data)
-        self.assertIn("Pedreiro".encode(), resposta.data)
-        self.assertIn("Capacete de Segurança".encode(), resposta.data)
-        self.assertIn("Total de itens retirados".encode(), resposta.data)
-        # a retirada tem valor: custo médio da entrada (12,50)
-        self.assertIn("R$ 12,50".encode(), resposta.data)
-
-    def test_busca_ambigua_sugere_seletor(self):
-        self.logar()
-        with self.app.app_context():
-            db.session.add(
-                Funcionario(
-                    nome="João Carlos",
-                    matricula="002",
-                    empresa="Engenharia Beta",
-                    cargo="Eletricista",
-                )
-            )
-            db.session.commit()
-        resposta = self.cliente.get("/relatorios/por-funcionario?funcionario=João")
-        self.assertIn("Vários funcionários".encode(), resposta.data)
-
-    def test_exportar_csv_retiradas(self):
-        self.logar()
-        _, codigo = self.criar_item("Capacete de Segurança")
-        self._fazer_retirada(codigo)
-        resposta = self.cliente.get(
-            "/relatorios/por-funcionario?funcionario=001&exportar=1"
-        )
-        texto = resposta.data.decode("utf-8")
-        self.assertTrue(texto.startswith("﻿"))
-        self.assertIn("Data;Produto;Quantidade", texto)
-        self.assertIn("Capacete de Segurança", texto)
-        self.assertIn("R$ 12,50", texto)
-
-    def test_pdf_relatorio_funcionario(self):
-        self.logar()
-        _, codigo = self.criar_item("Capacete de Segurança")
-        self._fazer_retirada(codigo)
-        resposta = self.cliente.get(
-            "/relatorios/por-funcionario?funcionario=001&pdf=1"
-        )
-        self.assertEqual(resposta.status_code, 200)
-        self.assertEqual(resposta.mimetype, "application/pdf")
-        self.assertTrue(resposta.data.startswith(b"%PDF"))
-        conteudo = self._conteudo_dos_streams(resposta.data)
-        # o reportlab grava acentos em octal (\343 = ã) — confere trechos sem acento
-        self.assertIn(b"da Silva", conteudo)
-        self.assertIn(b"Pedreiro", conteudo)
-        self.assertIn(b"Capacete de Seguran", conteudo)
-        self.assertIn(b"TOTAL DE ITENS", conteudo)
-        self.assertIn(b"R$", conteudo)  # total em R$ na última coluna
+        resposta = self.cliente.get("/entregadores/novo")
+        self.assertNotIn(b"list=", resposta.data)
+        resposta = self.cliente.get("/setores/novo")
+        self.assertNotIn(b"list=", resposta.data)
 
 
 class TesteRelatorios(BaseTeste):

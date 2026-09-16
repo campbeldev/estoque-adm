@@ -25,6 +25,10 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       SECRET_KEY: ${SECRET_KEY}
+    volumes:
+      # Persiste os comprovantes de entrega (assinatura + foto) fora do
+      # container, para sobreviverem a rebuilds e `docker compose down`.
+      - comprovantes:/app/instance/comprovantes
     ports:
       - "5051:5050"
     depends_on:
@@ -35,4 +39,7 @@ services:
 volumes:
   pgdata:
     name: estoque_adm_pgdata
+    external: true
+  comprovantes:
+    name: estoque_adm_comprovantes
     external: true

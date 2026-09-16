@@ -48,7 +48,8 @@ usuários em *Cadastros → Usuários* (perfil admin).
 
 Em produção o sistema usa **PostgreSQL** e roda em **containers Docker**, com
 manutenção contínua via **git**. O banco e o app sobem juntos com
-`docker compose`; os dados ficam num volume nomeado (`pgdata`) que sobrevive
+`docker compose`; os dados ficam em volumes nomeados (`pgdata` para o banco
+e `estoque_adm_comprovantes` para os comprovantes de entrega) que sobrevivem
 a rebuilds e reinícios.
 
 ### Pré-requisitos
@@ -63,6 +64,8 @@ a rebuilds e reinícios.
 git clone https://github.com/campbeldev/estoque-adm.git
 cd estoque-adm
 cp .env.example .env      # edite: POSTGRES_PASSWORD e SECRET_KEY
+docker volume create estoque_adm_pgdata
+docker volume create estoque_adm_comprovantes
 docker compose up -d --build
 ```
 
@@ -125,7 +128,7 @@ nasce populado e o `create_all()` do app vira no-op.
 Conferência:
 
 ```bash
-docker compose exec -T db psql -U estoque_adm -d estoque_adm -c "SELECT count(*) FROM funcionario;"
+docker compose exec -T db psql -U estoque_adm -d estoque_adm -c "SELECT count(*) FROM movimentacao;"
 ```
 
 ### Manutenção (rotina)

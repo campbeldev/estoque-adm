@@ -1,119 +1,156 @@
-"""Cadastros auxiliares: funcionários e obras (perfil admin)."""
+"""Cadastros auxiliares: entregadores, setores e obras (perfil admin)."""
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from sqlalchemy.exc import IntegrityError
 
 from . import db
 from .auth import admin_required
-from .models import (
-    Funcionario,
-    Obra,
-    opcoes_cargos,
-    sugestoes_funcionarios,
-    valores_unicos,
-)
+from .models import Entregador, Obra, Setor, valores_unicos
 
 bp = Blueprint("cadastros", __name__)
 
 
-# ----------------------------- Funcionários -----------------------------
+# ------------------------------ Entregadores -----------------------------
 
 
-def _sugestoes_busca_funcionario():
-    """Sugestões da busca de funcionários: nome, matrícula e empresa."""
-    return sugestoes_funcionarios()
+def _sugestoes_busca_entregador():
+    pares = []
+    for valor in valores_unicos(Entregador.nome):
+        pares.append((valor, "entregador"))
+    for valor in valores_unicos(Entregador.contato):
+        pares.append((valor, "contato"))
+    return pares
 
 
-def _sugestoes_form_funcionario():
-    # empresa e cargo se repetem entre funcionários; nome/matrícula não
-    return {"empresas": valores_unicos(Funcionario.empresa)}
-
-
-def _aplicar_funcionario(funcionario):
+def _aplicar_entregador(entregador):
     nome = request.form.get("nome", "").strip()
-    matricula = request.form.get("matricula", "").strip()
-    empresa = request.form.get("empresa", "").strip()
-    cargo = request.form.get("cargo", "").strip()
+    contato = request.form.get("contato", "").strip()
     if not nome:
-        return "Informe o nome do funcionário."
-    if not matricula:
-        return "Informe a matrícula do funcionário."
-    if not empresa:
-        return "Informe a empresa do funcionário."
-    if not cargo:
-        return "Informe o cargo do funcionário."
-    repetida = Funcionario.query.filter(
-        Funcionario.matricula == matricula,
-        Funcionario.empresa == empresa,
-        Funcionario.id != funcionario.id,
-    ).first()
-    if repetida is not None:
-        return "Já existe um funcionário com esta matrícula nesta empresa."
-    funcionario.nome = nome
-    funcionario.matricula = matricula
-    funcionario.empresa = empresa
-    funcionario.cargo = cargo
+        return "Informe o nome do entregador."
+    entregador.nome = nome
+    entregador.contato = contato or None
     return None
 
 
-@bp.route("/funcionarios")
+@bp.route("/entregadores")
 @admin_required
-def funcionarios():
+def entregadores():
     busca = request.args.get("busca", "").strip()
-    empresa = request.args.get("empresa", "").strip()
-    query = Funcionario.query
-    if empresa:
-        query = query.filter(Funcionario.empresa == empresa)
+    query = Entregador.query
     if busca:
         padrao = f"%{busca}%"
         query = query.filter(
             db.or_(
-                Funcionario.nome.ilike(padrao),
-                Funcionario.matricula.ilike(padrao),
-                Funcionario.empresa.ilike(padrao),
+                Entregador.nome.ilike(padrao),
+                Entregador.contato.ilike(padrao),
             )
         )
     return render_template(
-        "cadastros/funcionarios.html",
-        funcionarios=query.order_by(Funcionario.nome).all(),
+        "cadastros/entregadores.html",
+        entregadores=query.order_by(Entregador.nome).all(),
         busca=busca,
-        empresa=empresa,
-        empresas=valores_unicos(Funcionario.empresa),
-        sugestoes_busca=_sugestoes_busca_funcionario(),
+        sugestoes_busca=_sugestoes_busca_entregador(),
     )
 
 
-@bp.route("/funcionarios/novo", methods=["GET", "POST"])
+@bp.route("/entregadores/novo", methods=["GET", "POST"])
 @admin_required
-def funcionario_novo():
+def entregador_novo():
     if request.method == "POST":
-        funcionario = Funcionario()
-        erro = _aplicar_funcionario(funcionario)
+        entregador = Entregador()
+        erro = _aplicar_entregador(entregador)
         if erro:
             flash(erro, "danger")
         else:
-            db.session.add(funcionario)
-            try:
-                db.session.commit()
-            except IntegrityError:  # corrida entre dois cadastros simultâneos
-                db.session.rollback()
-                flash("Já existe um funcionário com esta matrícula nesta empresa.", "danger")
-            else:
-                flash(f"Funcionário criado: {funcionario.nome}.", "success")
-                return redirect(url_for("cadastros.funcionarios"))
+            db.session.add(entregador)
+            db.session.commit()
+            flash(f"Entregador criado: {entregador.nome}.", "success")
+            return redirect(url_for("cadastros.entregadores"))
+    return render_template("cadastros/entregador_form.html", entregador=None)
+
+
+@bp.route("/entregadores/<int:entregador_id>/editar", methods=["GET", "POST"])
+@admin_required
+def entregador_editar(entregador_id):
+    entregador = db.get_or_404(Entregador, entregador_id)
+    if request.method == "POST":
+        erro = _aplicar_entregador(entregador)
+        if erro:
+            flash(erro, "danger")
+        else:
+            db.session.commit()
+            flash("Entregador atualizado.", "success")
+            return redirect(url_for("cadastros.entregadores"))
+    return render_template("cadastros/entregador_form.html", entregador=entregador)
+
+
+@bp.route("/entregadores/<int:entregador_id>/desativar", methods=["POST"])
+@admin_required
+def entregador_desativar(entregador_id):
+    entregador = db.get_or_404(Entregador, entregador_id)
+    entregador.ativo = not entregador.ativo
+    db.session.commit()
+    estado = "reativado" if entregador.ativo else "desativado"
+    flash(f"Entregador {estado}: {entregador.nome}.", "success")
+    return redirect(url_for("cadastros.entregadores"))
+
+
+# -------------------------------- Setores --------------------------------
+
+
+def _sugestoes_busca_setor():
+    return [(valor, "setor") for valor in valores_unicos(Setor.nome)]
+
+
+def _aplicar_setor(setor):
+    nome = request.form.get("nome", "").strip()
+    if not nome:
+        return "Informe o nome do setor."
+    setor.nome = nome
+    return None
+
+
+@bp.route("/setores")
+@admin_required
+def setores():
+    busca = request.args.get("busca", "").strip()
+    query = Setor.query
+    if busca:
+        query = query.filter(Setor.nome.ilike(f"%{busca}%"))
     return render_template(
-        "cadastros/funcionario_form.html",
-        funcionario=None,
-        cargos=opcoes_cargos(),
-        **_sugestoes_form_funcionario(),
+        "cadastros/setores.html",
+        setores=query.order_by(Setor.nome).all(),
+        busca=busca,
+        sugestoes_busca=_sugestoes_busca_setor(),
     )
 
 
-@bp.route("/funcionarios/<int:funcionario_id>/editar", methods=["GET", "POST"])
+@bp.route("/setores/novo", methods=["GET", "POST"])
 @admin_required
-def funcionario_editar(funcionario_id):
-    funcionario = db.get_or_404(Funcionario, funcionario_id)
+def setor_novo():
     if request.method == "POST":
-        erro = _aplicar_funcionario(funcionario)
+        setor = Setor()
+        erro = _aplicar_setor(setor)
+        if erro:
+            flash(erro, "danger")
+        else:
+            db.session.add(setor)
+            try:
+                db.session.commit()
+            except IntegrityError:  # nome é único
+                db.session.rollback()
+                flash("Já existe um setor com este nome.", "danger")
+            else:
+                flash(f"Setor criado: {setor.nome}.", "success")
+                return redirect(url_for("cadastros.setores"))
+    return render_template("cadastros/setor_form.html", setor=None)
+
+
+@bp.route("/setores/<int:setor_id>/editar", methods=["GET", "POST"])
+@admin_required
+def setor_editar(setor_id):
+    setor = db.get_or_404(Setor, setor_id)
+    if request.method == "POST":
+        erro = _aplicar_setor(setor)
         if erro:
             flash(erro, "danger")
         else:
@@ -121,27 +158,11 @@ def funcionario_editar(funcionario_id):
                 db.session.commit()
             except IntegrityError:
                 db.session.rollback()
-                flash("Já existe um funcionário com esta matrícula nesta empresa.", "danger")
+                flash("Já existe um setor com este nome.", "danger")
             else:
-                flash("Funcionário atualizado.", "success")
-                return redirect(url_for("cadastros.funcionarios"))
-    return render_template(
-        "cadastros/funcionario_form.html",
-        funcionario=funcionario,
-        cargos=opcoes_cargos(),
-        **_sugestoes_form_funcionario(),
-    )
-
-
-@bp.route("/funcionarios/<int:funcionario_id>/desativar", methods=["POST"])
-@admin_required
-def funcionario_desativar(funcionario_id):
-    funcionario = db.get_or_404(Funcionario, funcionario_id)
-    funcionario.ativo = not funcionario.ativo
-    db.session.commit()
-    estado = "reativado" if funcionario.ativo else "desativado"
-    flash(f"Funcionário {estado}: {funcionario.nome}.", "success")
-    return redirect(url_for("cadastros.funcionarios"))
+                flash("Setor atualizado.", "success")
+                return redirect(url_for("cadastros.setores"))
+    return render_template("cadastros/setor_form.html", setor=setor)
 
 
 # -------------------------------- Obras ---------------------------------

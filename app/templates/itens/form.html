@@ -35,24 +35,6 @@
                value="{{ item.estoque_minimo if item else 0 }}">
       </div>
       <div class="col-md-3">
-        <label class="form-label">Tamanho (uniformes)</label>
-        <select class="form-select" name="tamanho">
-          <option value="">—</option>
-          {% for tamanho in tamanhos %}
-          <option value="{{ tamanho }}" {% if item and item.tamanho == tamanho %}selected{% endif %}>{{ tamanho }}</option>
-          {% endfor %}
-          {% if item and item.tamanho and item.tamanho not in tamanhos %}
-          <option value="{{ item.tamanho }}" selected>{{ item.tamanho }}</option>
-          {% endif %}
-        </select>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label" title="Certificado de Aprovação">CA (EPIs)</label>
-        <input class="form-control" name="ca" value="{{ item.ca if item else '' }}"
-               autocomplete="off" spellcheck="false">
-        <div class="form-text">Obrigatório para itens da categoria EPI.</div>
-      </div>
-      <div class="col-md-3">
         <label class="form-label">Código</label>
         <input class="form-control codigo" name="codigo"
                value="{{ item.codigo if item else '' }}" placeholder="vazio = gerar EV…"

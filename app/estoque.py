@@ -8,7 +8,6 @@ from .auth import admin_required, login_required
 from .models import (
     Item,
     Movimentacao,
-    nome_com_tamanho,
     opcoes_autocomplete,
     saldos_por_item,
     saldos_por_lote,
@@ -32,7 +31,6 @@ def index():
             db.or_(
                 Item.nome.ilike(padrao),
                 Item.codigo.ilike(padrao),
-                nome_com_tamanho().ilike(padrao),  # "Camisa Azul P"
             )
         )
     itens = query.order_by(Item.nome).all()

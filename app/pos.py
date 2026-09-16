@@ -6,22 +6,27 @@ de código em foco (autofocus) — sem JavaScript, sem perder leitura.
 O pacote (grupo de itens aguardando confirmação) vive na sessão Flask:
 sobrevive a atualizações e a saídas inacabadas, e é limpo ao confirmar
 ou ao sair do sistema.
+
+Destino: toda saída indica obra + setor. Se a obra não for a sede, exige
+também o entregador e cria uma Remessa (evento "despachada") para o
+rastreio. Saída para a sede não gera remessa (operamos aqui).
 """
 from flask import Blueprint, flash, g, redirect, render_template, request, session, url_for
 
 from . import db
 from .auth import login_required
 from .models import (
-    Funcionario,
+    Entregador,
+    EventoRemessa,
     Item,
     Movimentacao,
     Obra,
+    Remessa,
+    Setor,
     custos_medios_por_item,
     opcoes_autocomplete,
-    resolver_funcionario,
     resolver_item,
     saldos_por_item,
-    sugestoes_funcionarios,
 )
 
 bp = Blueprint("pos", __name__, url_prefix="/pos")
@@ -34,9 +39,12 @@ def _pacote():
 
 
 def _opcoes_destino():
-    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
     obras = Obra.query.filter_by(ativo=True).order_by(Obra.nome).all()
-    return funcionarios, obras
+    setores = Setor.query.order_by(Setor.nome).all()
+    entregadores = (
+        Entregador.query.filter_by(ativo=True).order_by(Entregador.nome).all()
+    )
+    return obras, setores, entregadores
 
 
 def _linhas_do_pacote(pacote):
@@ -67,24 +75,23 @@ def _linhas_do_pacote(pacote):
 @login_required
 def index():
     linhas = _linhas_do_pacote(_pacote())
-    funcionarios, obras = _opcoes_destino()
+    obras, setores, entregadores = _opcoes_destino()
     buscar = request.args.get("buscar", "").strip()
     sugestoes = []
     if buscar:
         _, sugestoes = resolver_item(buscar)
         sugestoes = [s for s in sugestoes if s.ativo]
 
-    # Texto digitado agora tem prioridade; senão, pré-preenche com o
-    # último funcionário usado (por nome — o texto é resolvido no POST).
-    funcionario_texto = request.args.get("funcionario_texto", "").strip()
-    if not funcionario_texto:
-        ultimo_id = session.get("pos_ultimo_funcionario")
-        if ultimo_id:
-            ultimo = db.session.get(Funcionario, ultimo_id)
-            funcionario_texto = ultimo.nome if ultimo else ""
+    # Destino pré-preenchido do último lançamento (ou da URL pós-erro).
     obra_id = request.args.get("obra_id", type=int)
     if obra_id is None:
         obra_id = session.get("pos_ultima_obra")
+    setor_id = request.args.get("setor_id", type=int)
+    if setor_id is None:
+        setor_id = session.get("pos_ultimo_setor")
+    entregador_id = request.args.get("entregador_id", type=int)
+    if entregador_id is None:
+        entregador_id = session.get("pos_ultimo_entregador")
 
     return render_template(
         "pos/index.html",
@@ -92,14 +99,15 @@ def index():
         total_estimado=sum(
             linha["qtd"] * (linha["custo"] or 0) for linha in linhas
         ),
-        funcionarios=funcionarios,
         obras=obras,
+        setores=setores,
+        entregadores=entregadores,
         modo_rapido=session.get("pos_modo_rapido", False),
-        funcionario_texto=funcionario_texto,
         obra_id=obra_id,
+        setor_id=setor_id,
+        entregador_id=entregador_id,
         sugestoes=sugestoes,
         autocomplete=opcoes_autocomplete(),
-        sugestoes_funcionarios=sugestoes_funcionarios(),
     )
 
 
@@ -136,52 +144,79 @@ def adicionar():
     return redirect(url_for("pos.index"))
 
 
-def _funcionario_do_form():
-    """Resolve o texto digitado no campo funcionário para um registro.
+def _destino_do_form():
+    """Resolve obra + setor (+ entregador, se a obra não for a sede).
 
-    Retorna (funcionario, mensagem_de_erro) — exatamente um dos dois.
+    Retorna (obra, setor, entregador, erro) — preenche OU os três destinos,
+    OU a mensagem de erro.
     """
-    texto = request.form.get("funcionario", "").strip()
-    if not texto:
-        return None, "Digite o funcionário que está retirando."
-    funcionario, alternativas = resolver_funcionario(texto)
-    if funcionario is None:
-        if alternativas:
-            nomes = ", ".join(f.nome for f in alternativas[:4])
-            reticencias = "…" if len(alternativas) > 4 else ""
-            return None, (
-                f"Vários funcionários correspondem a \"{texto}\": {nomes}{reticencias}. "
-                "Digite o nome completo ou a matrícula exata."
+    obra_id = request.form.get("obra_id", type=int)
+    setor_id = request.form.get("setor_id", type=int)
+    obra = db.session.get(Obra, obra_id) if obra_id else None
+    if obra is None:
+        return None, None, None, "Selecione a obra de destino."
+    setor = db.session.get(Setor, setor_id) if setor_id else None
+    if setor is None:
+        return None, None, None, "Selecione o setor de destino."
+    entregador = None
+    if not obra.eh_sede:
+        entregador_id = request.form.get("entregador_id", type=int)
+        entregador = (
+            db.session.get(Entregador, entregador_id) if entregador_id else None
+        )
+        if entregador is None:
+            return None, None, None, (
+                "A obra não é a sede — informe quem transporta (entregador)."
             )
-        return None, f"Funcionário não encontrado: {texto}."
-    if not funcionario.ativo:
-        return None, f"Funcionário desativado: {funcionario.nome}."
-    return funcionario, None
+    return obra, setor, entregador, None
+
+
+def _criar_remessa(obra, setor, entregador):
+    """Cria a Remessa + evento "despachada" (o pontapé do rastreio)."""
+    remessa = Remessa(
+        codigo="",  # placeholder — o flush libera o id
+        obra_id=obra.id,
+        setor_id=setor.id,
+        transportador_id=entregador.id,
+    )
+    db.session.add(remessa)
+    db.session.flush()
+    remessa.codigo = f"RM{remessa.id:06d}"
+    db.session.add(
+        EventoRemessa(
+            remessa_id=remessa.id,
+            tipo="despachada",
+            usuario_id=g.usuario.id,
+        )
+    )
+    return remessa
 
 
 def _voltar_com_contexto(erro):
     """Flash do erro + volta para o caixa preservando o que foi digitado."""
     flash(erro, "danger")
-    texto = request.form.get("funcionario", "").strip()
-    obra_id = request.form.get("obra_id", type=int)
     return redirect(
-        url_for("pos.index", funcionario_texto=texto or None, obra_id=obra_id)
+        url_for(
+            "pos.index",
+            obra_id=request.form.get("obra_id", type=int),
+            setor_id=request.form.get("setor_id", type=int),
+            entregador_id=request.form.get("entregador_id", type=int),
+        )
     )
 
 
 def _saida_direta(item):
     """Modo rápido: cada leitura baixa 1 unidade na hora."""
-    funcionario, erro = _funcionario_do_form()
+    obra, setor, entregador, erro = _destino_do_form()
     if erro:
         return _voltar_com_contexto(erro)
-    obra_id = request.form.get("obra_id", type=int)
-
-    if not obra_id:
-        flash("Selecione a obra de destino.", "danger")
-        return redirect(url_for("pos.index"))
     if saldos_por_item([item.id]).get(item.id, 0) < 1:
         flash(f"Sem saldo para {item.nome}.", "danger")
         return redirect(url_for("pos.index"))
+
+    remessa = None
+    if not obra.eh_sede:
+        remessa = _criar_remessa(obra, setor, entregador)
 
     # A saída guarda o custo médio do item naquele momento: é o que dá
     # valor aos relatórios de retiradas (a entrada é a única com preço).
@@ -192,15 +227,18 @@ def _saida_direta(item):
             quantidade=1,
             item_id=item.id,
             usuario_id=g.usuario.id,
-            funcionario_id=funcionario.id,
-            obra_id=obra_id,
+            obra_id=obra.id,
+            setor_id=setor.id,
+            remessa_id=remessa.id if remessa else None,
             valor_unitario_cents=custo,
         )
     )
     db.session.commit()
     # Lembra o destino para agilizar as próximas leituras
-    session["pos_ultimo_funcionario"] = funcionario.id
-    session["pos_ultima_obra"] = obra_id
+    session["pos_ultima_obra"] = obra.id
+    session["pos_ultimo_setor"] = setor.id
+    if entregador:
+        session["pos_ultimo_entregador"] = entregador.id
     flash(f"Saída registrada: {item.nome} (1 unidade).", "success")
     return redirect(url_for("pos.index"))
 
@@ -237,18 +275,14 @@ def atualizar():
 @login_required
 def finalizar():
     session["pos_modo_rapido"] = request.form.get("modo_rapido") == "on"
-    obra_id = request.form.get("obra_id", type=int)
     pacote = _pacote()
 
     if not pacote:
         flash("Pacote vazio.", "warning")
         return redirect(url_for("pos.index"))
-    funcionario, erro = _funcionario_do_form()
+    obra, setor, entregador, erro = _destino_do_form()
     if erro:
         return _voltar_com_contexto(erro)
-    if not obra_id:
-        flash("Selecione a obra de destino.", "danger")
-        return redirect(url_for("pos.index"))
 
     ids = [int(chave) for chave in pacote]
     itens = {item.id: item for item in Item.query.filter(Item.id.in_(ids)).all()}
@@ -274,6 +308,10 @@ def finalizar():
             flash(f"Saldo insuficiente — {bloqueio}.", "danger")
         return redirect(url_for("pos.index"))  # pacote permanece intacto
 
+    remessa = None
+    if not obra.eh_sede:
+        remessa = _criar_remessa(obra, setor, entregador)
+
     # Custo médio de cada item do pacote — gravado na saída para os
     # relatórios terem valor mesmo depois que novos preços chegarem.
     custos = custos_medios_por_item([int(chave) for chave in pacote])
@@ -284,16 +322,19 @@ def finalizar():
                 quantidade=quantidade,
                 item_id=int(chave),
                 usuario_id=g.usuario.id,
-                funcionario_id=funcionario.id,
-                obra_id=obra_id,
+                obra_id=obra.id,
+                setor_id=setor.id,
+                remessa_id=remessa.id if remessa else None,
                 valor_unitario_cents=custos.get(int(chave)),
             )
         )
     db.session.commit()
     total_itens = len(pacote)
     session["carrinho"] = {}
-    session["pos_ultimo_funcionario"] = funcionario.id
-    session["pos_ultima_obra"] = obra_id
+    session["pos_ultima_obra"] = obra.id
+    session["pos_ultimo_setor"] = setor.id
+    if entregador:
+        session["pos_ultimo_entregador"] = entregador.id
     flash(
         f"Saída registrada — {total_itens} "
         f"{'item baixado' if total_itens == 1 else 'itens baixados'} do estoque.",

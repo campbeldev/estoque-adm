@@ -11,6 +11,7 @@
 
   /* Azul corporativo sóbrio no lugar do azul padrão */
   --bs-primary: #1d6ab2;
+  --bs-secondary: #b00909;
   --bs-primary-rgb: 29, 106, 178;
   --bs-link-color: #1d6ab2;
   --bs-link-color-rgb: 29, 106, 178;
@@ -175,4 +176,133 @@ main.container {
 .codigo {
   font-family: Consolas, Menlo, monospace;
   font-size: 0.85rem;
+}
+
+/* Rastreio de entregas — linha do tempo horizontal (despachada → recebida) */
+.rastreio {
+  position: relative;
+  margin: 0.5rem 0.5rem 1.5rem;
+}
+
+.rastreio-linha {
+  position: absolute;
+  top: 22px;
+  left: 60px;
+  right: 60px;
+  height: 4px;
+  border-radius: 2px;
+  background: #d8dee4;
+}
+
+.rastreio-preenchida {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--bs-primary);
+}
+
+.rastreio-preenchida.rastreio-cancelada {
+  background: #b00909;
+}
+
+.rastreio-marcadores {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+}
+
+.rastreio-marcador {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  width: 120px;
+  text-align: center;
+}
+
+.rastreio-bolinha {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #d8dee4;
+  color: #b9c4ce;
+  z-index: 1;
+}
+
+.rastreio-bolinha.concluido {
+  border-color: var(--bs-primary);
+  color: var(--bs-primary);
+}
+
+.rastreio-bolinha.cancelado {
+  border-color: #b00909;
+  color: #b00909;
+}
+
+.rastreio-rotulo {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.rastreio-data {
+  font-size: 0.75rem;
+  color: #77828e;
+}
+
+/* Eventos — linha do tempo vertical */
+.rastreio-eventos {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 2px;
+}
+
+.rastreio-eventos li {
+  position: relative;
+  padding: 0 0 1.25rem 2rem;
+  border-left: 2px solid #d8dee4;
+}
+
+.rastreio-eventos li:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0;
+}
+
+.rastreio-evento-ponto {
+  position: absolute;
+  left: -9px;
+  top: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bs-primary);
+  border: 3px solid #fff;
+}
+
+.rastreio-evento-ponto.despachada {
+  background: var(--bs-primary);
+  box-shadow: 0 0 0 1px var(--bs-primary);
+}
+
+.rastreio-evento-ponto.recebida {
+  background: #198754;
+  box-shadow: 0 0 0 1px #198754;
+}
+
+.rastreio-evento-ponto.cancelada {
+  background: #b00909;
+  box-shadow: 0 0 0 1px #b00909;
+}
+
+/* Canvas de assinatura (registro de recebimento) */
+.canvas-assinatura {
+  display: block;
+  width: 100%;
+  max-width: 520px;
+  background: #fff;
+  border: 1px solid #d8dee4;
+  touch-action: none;
+  cursor: crosshair;
 }

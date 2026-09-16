@@ -14,7 +14,6 @@ from .auth import admin_required
 from .models import (
     Categoria,
     Item,
-    nome_com_tamanho,
     opcoes_autocomplete,
     saldos_por_item,
 )
@@ -22,7 +21,6 @@ from .models import (
 bp = Blueprint("itens", __name__, url_prefix="/itens")
 
 UNIDADES = ("un", "pc", "cx")
-TAMANHOS = ("P", "M", "G", "GG", "XG", "EXGG")
 
 
 def _aplicar_form(item):
@@ -31,8 +29,6 @@ def _aplicar_form(item):
     categoria_id = request.form.get("categoria_id", type=int)
     unidade = request.form.get("unidade", "")
     estoque_minimo = request.form.get("estoque_minimo", type=int)
-    tamanho = request.form.get("tamanho", "").strip()
-    ca = request.form.get("ca", "").strip()
 
     if not nome:
         return "Informe o nome do item."
@@ -48,13 +44,6 @@ def _aplicar_form(item):
     item.categoria_id = categoria.id
     item.unidade = unidade
     item.estoque_minimo = estoque_minimo
-    item.tamanho = tamanho or None
-    item.ca = ca or None
-
-    # A validade é do lote que chega, não do cadastro — é informada
-    # na entrada (Movimentacao.validade).
-    if categoria.nome == "EPI" and not item.ca:
-        return "Itens de EPI exigem o CA (Certificado de Aprovação)."
     return None
 
 
@@ -69,7 +58,6 @@ def listar():
             db.or_(
                 Item.nome.ilike(padrao),
                 Item.codigo.ilike(padrao),
-                nome_com_tamanho().ilike(padrao),  # "Camisa Azul P"
             )
         )
     itens = query.order_by(Item.nome).all()
@@ -112,7 +100,7 @@ def novo():
                 )
                 return redirect(url_for("itens.listar"))
     return render_template(
-        "itens/form.html", item=None, categorias=categorias, tamanhos=TAMANHOS
+        "itens/form.html", item=None, categorias=categorias
     )
 
 
@@ -138,7 +126,7 @@ def editar(item_id):
                 flash("Item atualizado.", "success")
                 return redirect(url_for("itens.listar"))
     return render_template(
-        "itens/form.html", item=item, categorias=categorias, tamanhos=TAMANHOS
+        "itens/form.html", item=item, categorias=categorias
     )
 
 

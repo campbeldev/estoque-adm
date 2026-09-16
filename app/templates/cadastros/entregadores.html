@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "macros.html" import sugestoes_valores %}
+{% set aba = 'cadastros' %}
+{% block titulo %}Entregadores{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">Entregadores</h1>
+  <a class="btn btn-primary" href="{{ url_for('cadastros.entregador_novo') }}">+ Novo entregador</a>
+</div>
+{{ sugestoes_valores(sugestoes_busca, 'sugestoes-busca-entregador') }}
+<form class="row g-2 mb-3" method="get">
+  <div class="col-auto flex-grow-1">
+    <input class="form-control" name="busca" value="{{ busca }}" placeholder="Buscar por nome ou contato…"
+           list="sugestoes-busca-entregador" autocomplete="off" spellcheck="false">
+  </div>
+  <div class="col-auto"><button class="btn btn-outline-secondary">Buscar</button></div>
+</form>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Nome</th><th>Contato</th><th>Situação</th><th></th></tr></thead>
+      <tbody>
+        {% for entregador in entregadores %}
+        <tr>
+          <td class="{{ 'item-inativo' if not entregador.ativo }}">{{ entregador.nome }}</td>
+          <td>{{ entregador.contato or '—' }}</td>
+          <td>
+            {% if entregador.ativo %}<span class="badge text-bg-success">Ativo</span>
+            {% else %}<span class="badge text-bg-secondary">Inativo</span>{% endif %}
+          </td>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('cadastros.entregador_editar', entregador_id=entregador.id) }}">Editar</a>
+            <form class="d-inline" method="post" action="{{ url_for('cadastros.entregador_desativar', entregador_id=entregador.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-{{ 'success' if not entregador.ativo else 'danger' }}">
+                {{ 'Reativar' if not entregador.ativo else 'Desativar' }}
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-muted text-center py-4">Nenhum entregador cadastrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -42,6 +42,43 @@ def migrar_leve():
         )
     )
 
+    # 2b) colunas da logística de entrega (obra + movimentacao).
+    # Nota: a tabela `funcionario` e a coluna `movimentacao.funcionario_id`
+    # (herança do estoque-rh) saíram do modelo. Em bancos antigos elas ficam
+    # como órfãs inofensivas — a migração só adiciona, nunca destrói dados.
+    colunas_obra = {c["name"] for c in insp.get_columns("obra")}
+    if "eh_sede" not in colunas_obra:
+        db.session.execute(db.text("ALTER TABLE obra ADD COLUMN eh_sede BOOLEAN"))
+    if "remessa_id" not in colunas:
+        db.session.execute(
+            db.text(
+                "ALTER TABLE movimentacao ADD COLUMN remessa_id INTEGER "
+                "REFERENCES remessa(id)"
+            )
+        )
+    if "setor_id" not in colunas:
+        db.session.execute(
+            db.text(
+                "ALTER TABLE movimentacao ADD COLUMN setor_id INTEGER "
+                "REFERENCES setor(id)"
+            )
+        )
+    db.session.execute(
+        db.text(
+            "CREATE INDEX IF NOT EXISTS ix_movimentacao_remessa "
+            "ON movimentacao (remessa_id)"
+        )
+    )
+
+    # coluna nova na remessa (foto opcional do recebimento, além da assinatura)
+    colunas_remessa = {c["name"] for c in insp.get_columns("remessa")}
+    if "comprovante_foto_arq" not in colunas_remessa:
+        db.session.execute(
+            db.text(
+                "ALTER TABLE remessa ADD COLUMN comprovante_foto_arq VARCHAR(255)"
+            )
+        )
+
     # 3) entradas legadas viram Notas (série vazia), agrupadas por
     #    (nota_fiscal, fornecedor) — idempotente: só pega nota_id NULL
     pendentes = (

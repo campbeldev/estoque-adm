@@ -19,7 +19,7 @@ Base do antigo `estoque-rh`, agora para o **setor administrativo**.
 - **Produção (Docker):** app em `http://localhost:5051` (container 5050);
   PostgreSQL no host `5434` (container 5432); volume `estoque_adm_pgdata`
   (externo); banco/usuário `estoque_adm` via `.env`.
-  - Antes do 1º up: `docker volume create estoque_adm_pgdata`.
+  - Antes do 1º up: `docker volume create estoque_adm_pgdata estoque_adm_comprovantes`.
   - Seed: `docker compose exec app python -m flask --app app seed`.
 - **Dev (SQLite):** `python -m flask --app app run --debug` (porta 5000).
 - **Testes:** `python -m unittest discover tests`.

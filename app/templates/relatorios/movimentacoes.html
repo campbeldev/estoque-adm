@@ -39,7 +39,7 @@
       <thead>
         <tr>
           <th>Data</th><th>Tipo</th><th>Item</th><th class="text-end">Qtd</th><th>Un.</th>
-          <th>Funcionário</th><th>Obra</th><th>Usuário</th><th>Fornecedor</th><th>Nota</th><th>Observação</th><th class="text-end">Valor total</th>
+          <th>Setor</th><th>Obra</th><th>Usuário</th><th>Fornecedor</th><th>Nota</th><th>Observação</th><th class="text-end">Valor total</th>
         </tr>
       </thead>
       <tbody>
@@ -54,7 +54,7 @@
           <td>{{ mov.item.nome }}</td>
           <td class="text-end">{{ mov.quantidade }}</td>
           <td>{{ UNIDADES[mov.item.unidade] }}</td>
-          <td>{{ mov.funcionario.nome if mov.funcionario else '—' }}</td>
+          <td>{{ mov.setor.nome if mov.setor else '—' }}</td>
           <td>{{ mov.obra.nome if mov.obra else '—' }}</td>
           <td>{{ mov.usuario.nome }}</td>
           <td>{{ mov.fornecedor or '—' }}</td>

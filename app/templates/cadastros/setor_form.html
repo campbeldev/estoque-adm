@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% set aba = 'cadastros' %}
+{% block titulo %}{{ 'Editar setor' if setor else 'Novo setor' }}{% endblock %}
+{% block conteudo %}
+<h1 class="h4 mb-3">{{ 'Editar setor' if setor else 'Novo setor' }}</h1>
+<div class="card">
+  <div class="card-body">
+    <form method="post" class="row g-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-6">
+        <label class="form-label">Nome do setor *</label>
+        <input class="form-control" name="nome" value="{{ setor.nome if setor else '' }}"
+               autocomplete="off" spellcheck="false" required>
+        <div class="form-text">Não pode se repetir.</div>
+      </div>
+      <div class="col-12">
+        <button class="btn btn-primary">Salvar</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('cadastros.setores') }}">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

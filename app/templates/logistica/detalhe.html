@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% set aba = 'logistica' %}
+{% block titulo %}Rastreio {{ remessa.codigo }}{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">Rastreio <span class="codigo">{{ remessa.codigo }}</span></h1>
+  <div class="d-flex gap-2">
+    {% if remessa.status == 'despachada' %}
+    <a class="btn btn-primary" href="{{ url_for('logistica.receber', remessa_id=remessa.id) }}">Registrar recebimento</a>
+    {% endif %}
+    <a class="btn btn-outline-secondary" href="{{ url_for('logistica.index') }}">Voltar</a>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <span class="text-muted small d-block">OBRA</span>
+        <strong>{{ remessa.obra.nome }}</strong>
+      </div>
+      <div class="col-md-3">
+        <span class="text-muted small d-block">SETOR</span>
+        {{ remessa.setor.nome }}
+      </div>
+      <div class="col-md-3">
+        <span class="text-muted small d-block">TRANSPORTADOR</span>
+        {{ remessa.transportador.nome }}
+        {% if remessa.transportador.contato %}<div class="small text-muted">{{ remessa.transportador.contato }}</div>{% endif %}
+      </div>
+      <div class="col-md-3">
+        <span class="text-muted small d-block">SITUAÇÃO</span>
+        <span class="badge {{ STATUS[remessa.status].badge }}">{{ STATUS[remessa.status].rotulo }}</span>
+      </div>
+      {% if remessa.recebido_por %}
+      <div class="col-12 border-top pt-3 mt-1">
+        <span class="text-muted small d-block">RECEBIDO POR</span>
+        {{ remessa.recebido_por }}
+        {% if remessa.data_recebimento %}<span class="text-muted small"> · {{ formatar_data_hora(remessa.data_recebimento) }}</span>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="rastreio">
+      <div class="rastreio-linha">
+        <div class="rastreio-preenchida {{ 'rastreio-cancelada' if cancelada }}" style="width: {{ '100%' if (recebida or cancelada) else '0%' }}"></div>
+      </div>
+      <div class="rastreio-marcadores">
+        <div class="rastreio-marcador">
+          <div class="rastreio-bolinha concluido">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2a3 3 0 0 0 6 0h6a3 3 0 0 0 6 0h2v-5l-3-4zM7 18.5c-.83 0-1.5-.67-1.5-1.5S6.17 15.5 7 15.5 8.5 16.17 8.5 17 7.83 18.5 7 18.5zm10 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM17 11V9h2.5l2 2.5H17z"/></svg>
+          </div>
+          <div class="rastreio-rotulo">Despachada</div>
+          <div class="rastreio-data">{{ formatar_data_hora(despachada.data) }}</div>
+        </div>
+        <div class="rastreio-marcador">
+          <div class="rastreio-bolinha {{ 'concluido' if recebida else ('cancelado' if cancelada else 'pendente') }}">
+            {% if cancelada %}
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>
+            {% else %}
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            {% endif %}
+          </div>
+          <div class="rastreio-rotulo">{{ 'Cancelada' if cancelada else 'Recebida' }}</div>
+          <div class="rastreio-data">
+            {% if recebida %}{{ formatar_data_hora(recebida.data) }}
+            {% elif cancelada %}{{ formatar_data_hora(cancelada.data) }}
+            {% else %}Aguardando…{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if recebida and (remessa.comprovante_arq or remessa.comprovante_foto_arq) %}
+<div class="card mb-3">
+  <div class="card-header">Comprovante de entrega</div>
+  <div class="card-body">
+    <div class="row g-3">
+      {% if remessa.comprovante_arq %}
+      <div class="col-md-6">
+        <span class="text-muted small d-block mb-1">ASSINATURA</span>
+        <img class="img-fluid border" src="{{ url_for('logistica.comprovante', remessa_id=remessa.id, tipo='assinatura') }}" alt="Assinatura de {{ remessa.recebido_por }}">
+      </div>
+      {% endif %}
+      {% if remessa.comprovante_foto_arq %}
+      <div class="col-md-6">
+        <span class="text-muted small d-block mb-1">FOTO</span>
+        <img class="img-fluid border" src="{{ url_for('logistica.comprovante', remessa_id=remessa.id, tipo='foto') }}" alt="Foto do recebimento">
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<h2 class="h6 text-uppercase text-muted mb-3">Histórico</h2>
+<ul class="rastreio-eventos">
+  {% for evento in remessa.eventos %}
+  <li>
+    <span class="rastreio-evento-ponto {{ evento.tipo }}"></span>
+    <strong>{{ STATUS[evento.tipo].rotulo }}</strong>
+    <div class="text-muted small">{{ formatar_data_hora(evento.data) }} · {{ evento.usuario.nome }}</div>
+    {% if evento.observacao %}<div class="small mt-1">{{ evento.observacao }}</div>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

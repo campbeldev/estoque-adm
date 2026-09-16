@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% set aba = 'cadastros' %}
+{% block titulo %}{{ 'Editar entregador' if entregador else 'Novo entregador' }}{% endblock %}
+{% block conteudo %}
+<h1 class="h4 mb-3">{{ 'Editar entregador' if entregador else 'Novo entregador' }}</h1>
+<div class="card">
+  <div class="card-body">
+    <form method="post" class="row g-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-6">
+        <label class="form-label">Nome *</label>
+        <input class="form-control" name="nome" value="{{ entregador.nome if entregador else '' }}"
+               autocomplete="off" spellcheck="false" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Contato (telefone/whatsapp)</label>
+        <input class="form-control" name="contato"
+               value="{{ entregador.contato if entregador and entregador.contato else '' }}"
+               autocomplete="off" spellcheck="false">
+      </div>
+      <div class="col-12">
+        <button class="btn btn-primary">Salvar</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('cadastros.entregadores') }}">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

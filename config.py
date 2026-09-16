@@ -36,3 +36,12 @@ class Config:
     BACKUP_DIR = os.environ.get("ESTOQUE_BACKUP_DIR") or os.path.join(
         BASE_DIR, "backups"
     )
+
+    # Pasta dos comprovantes de entrega (assinatura e foto do recebimento).
+    # Fica em instance/ (fora do git); em produção, aponte para um volume.
+    COMPROVANTES_DIR = os.environ.get("ESTOQUE_COMPROVANTES_DIR") or os.path.join(
+        BASE_DIR, "instance", "comprovantes"
+    )
+
+    # Limite para o upload da foto do comprovante (a assinatura vem no form).
+    MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10 MB

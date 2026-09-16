@@ -44,6 +44,19 @@ class Categoria(db.Model):
     nome = db.Column(db.String(60), nullable=False, unique=True)
 
 
+class Setor(db.Model):
+    """Área de destino do material (escritório, limpeza, alojamento...).
+
+    Diferente de Categoria (o que o item é): o setor responde *para qual
+    área* o material vai. Uma saída escolhe obra + setor.
+    """
+
+    __tablename__ = "setor"
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(60), nullable=False, unique=True)
+
+
 class Item(db.Model):
     __tablename__ = "item"
     __table_args__ = (
@@ -62,29 +75,27 @@ class Item(db.Model):
     # (ex.: kg de cimento), migrar para Numeric junto com o PostgreSQL
     estoque_minimo = db.Column(db.Integer, nullable=False, default=0)
     codigo = db.Column(db.String(30), nullable=False, unique=True)
-    tamanho = db.Column(db.String(10))  # ex.: P/M/G/GG (uniformes)
-    # A validade não mora aqui: é do LOTE que chega, registrada na entrada
-    # (Movimentacao.validade). Colunas legadas de bancos antigos ficam órfãs.
-    ca = db.Column(db.String(30))  # Certificado de Aprovação (EPIs)
+    # A validade é do LOTE que chega (Movimentacao.validade), não do cadastro.
+    # Colunas legadas do estoque-rh (tamanho/uniforme, ca/EPI) ficam órfãs em
+    # bancos antigos — a migração só adiciona, nunca destrói.
     ativo = db.Column(db.Boolean, nullable=False, default=True)
     data_criacao = db.Column(db.DateTime, nullable=False, default=datetime.now)
 
     categoria = db.relationship("Categoria", lazy="joined")
 
 
-class Funcionario(db.Model):
-    __tablename__ = "funcionario"
-    __table_args__ = (
-        # Matrícula é única por empresa (a mesma matrícula pode existir
-        # em empresas diferentes).
-        db.UniqueConstraint("matricula", "empresa", name="uq_funcionario_matricula_empresa"),
-    )
+class Entregador(db.Model):
+    """Quem transporta uma remessa (funcionário, motoboy ou terceiro).
+
+    Substitui o Funcionario legado do RH: só nome e contato, sem
+    matrícula/empresa/cargo — que não fazem sentido no setor administrativo.
+    """
+
+    __tablename__ = "entregador"
 
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)
-    matricula = db.Column(db.String(30), nullable=False)
-    empresa = db.Column(db.String(120), nullable=False, default="")  # obrigatória no formulário
-    cargo = db.Column(db.String(60))  # opcional, com sugestões no formulário
+    contato = db.Column(db.String(60))  # telefone/whatsapp
     ativo = db.Column(db.Boolean, nullable=False, default=True)
 
 
@@ -93,6 +104,8 @@ class Obra(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)
+    # A sede é a exceção logística: saída para ela não gera remessa.
+    eh_sede = db.Column(db.Boolean, nullable=False, default=False)
     ativo = db.Column(db.Boolean, nullable=False, default=True)
 
 
@@ -120,6 +133,71 @@ class Nota(db.Model):
     usuario = db.relationship("Usuario", lazy="joined")
 
 
+class Remessa(db.Model):
+    """A viagem de entrega: um destino (obra + setor) e um transportador.
+
+    Nasce junto com a saída para uma obra que não seja a sede. O status é
+    derivado do último EventoRemessa (despachada → recebida → ...), nunca
+    salvo — mesmo princípio do saldo.
+    """
+
+    __tablename__ = "remessa"
+
+    id = db.Column(db.Integer, primary_key=True)
+    codigo = db.Column(db.String(30), nullable=False, unique=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey("obra.id"), nullable=False)
+    setor_id = db.Column(db.Integer, db.ForeignKey("setor.id"), nullable=False)
+    transportador_id = db.Column(
+        db.Integer, db.ForeignKey("entregador.id"), nullable=False
+    )
+    # Preenchidos na entrega (evento "recebida"):
+    recebido_por = db.Column(db.String(120))  # nome livre de quem recebeu
+    comprovante_tipo = db.Column(db.String(20))  # 'assinatura' | 'foto' | 'ambos'
+    comprovante_arq = db.Column(db.String(255))  # arquivo da assinatura (PNG)
+    comprovante_foto_arq = db.Column(db.String(255))  # arquivo da foto (opcional)
+    data_criacao = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    data_recebimento = db.Column(db.DateTime)
+
+    obra = db.relationship("Obra", lazy="joined")
+    setor = db.relationship("Setor", lazy="joined")
+    transportador = db.relationship("Entregador", lazy="joined")
+    eventos = db.relationship(
+        "EventoRemessa", lazy="selectin", order_by="EventoRemessa.id",
+        back_populates="remessa",
+    )
+
+    @property
+    def status(self):
+        """Status derivado do último evento (ou 'despachada' sem eventos)."""
+        return self.eventos[-1].tipo if self.eventos else "despachada"
+
+
+class EventoRemessa(db.Model):
+    """Um passo na timeline da remessa — inserido, nunca editado.
+
+    Cada linha vira uma bolinha do rastreio (despachada, recebida, ...).
+    """
+
+    __tablename__ = "evento_remessa"
+    __table_args__ = (
+        db.Index("ix_evento_remessa_remessa", "remessa_id"),
+        db.CheckConstraint(
+            "tipo IN ('despachada', 'recebida', 'cancelada')",
+            name="ck_evento_remessa_tipo",
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    remessa_id = db.Column(db.Integer, db.ForeignKey("remessa.id"), nullable=False)
+    tipo = db.Column(db.String(20), nullable=False)
+    data = db.Column(db.DateTime, nullable=False, default=datetime.now, index=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuario.id"), nullable=False)
+    observacao = db.Column(db.String(255))
+
+    remessa = db.relationship("Remessa", lazy="joined", back_populates="eventos")
+    usuario = db.relationship("Usuario", lazy="joined")
+
+
 class Movimentacao(db.Model):
     """Registro imutável de cada entrada/saída/ajuste — a fonte da verdade.
 
@@ -131,6 +209,7 @@ class Movimentacao(db.Model):
     __table_args__ = (
         db.Index("ix_movimentacao_item", "item_id"),
         db.Index("ix_movimentacao_tipo", "tipo"),
+        db.Index("ix_movimentacao_remessa", "remessa_id"),
         db.CheckConstraint(
             "tipo IN ('entrada', 'saida', 'ajuste')", name="ck_movimentacao_tipo"
         ),
@@ -143,8 +222,9 @@ class Movimentacao(db.Model):
     quantidade = db.Column(db.Integer, nullable=False)
     item_id = db.Column(db.Integer, db.ForeignKey("item.id"), nullable=False)
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuario.id"), nullable=False)
-    funcionario_id = db.Column(db.Integer, db.ForeignKey("funcionario.id"))  # quem recebeu (saída)
     obra_id = db.Column(db.Integer, db.ForeignKey("obra.id"))  # destino (saída)
+    setor_id = db.Column(db.Integer, db.ForeignKey("setor.id"))  # área do destino (saída)
+    remessa_id = db.Column(db.Integer, db.ForeignKey("remessa.id"))  # logística (saída)
     # Legado (deprecado): as entradas novas gravam fornecedor/nota_fiscal
     # como cópia para exibição, mas a fonte canônica é a Nota.
     fornecedor = db.Column(db.String(120))  # entrada
@@ -159,8 +239,9 @@ class Movimentacao(db.Model):
 
     item = db.relationship("Item", lazy="joined")
     usuario = db.relationship("Usuario", lazy="joined")
-    funcionario = db.relationship("Funcionario", lazy="joined")
     obra = db.relationship("Obra", lazy="joined")
+    setor = db.relationship("Setor", lazy="joined")
+    remessa = db.relationship("Remessa", lazy="joined")
     nota = db.relationship("Nota", lazy="joined")
 
     @property
@@ -284,24 +365,12 @@ def saldos_por_lote(item_ids=None):
     return resultado
 
 
-def nome_com_tamanho():
-    """Expressão SQL "nome + tamanho" (ex.: "Camisa Azul P").
-
-    O usuário lê e digita o item com o tamanho junto ao nome; as buscas
-    e o autocomplete usam essa expressão para casar as duas formas.
-    """
-    return Item.nome + " " + db.func.coalesce(Item.tamanho, "")
-
-
 def opcoes_autocomplete():
-    """Pares (nome, codigo) dos itens ativos para o autocomplete
-    nativo (datalist) dos campos de busca. Itens com tamanho exibem o
-    nome com o tamanho junto ("Camisa Azul P"), como o usuário escreve."""
+    """Pares (nome, codigo) dos itens ativos para o autocomplete nativo
+    (datalist) dos campos de busca."""
     return [
-        ((f"{nome} {tamanho}" if tamanho else nome), codigo)
-        for nome, codigo, tamanho in Item.query.with_entities(
-            Item.nome, Item.codigo, Item.tamanho
-        )
+        (nome, codigo)
+        for nome, codigo in Item.query.with_entities(Item.nome, Item.codigo)
         .filter_by(ativo=True)
         .order_by(Item.nome)
         .all()
@@ -318,64 +387,6 @@ def valores_unicos(coluna):
         .order_by(coluna)
         .all()
     ]
-
-
-def opcoes_cargos():
-    """Cargos já usados nos funcionários, para sugestão no formulário."""
-    return valores_unicos(Funcionario.cargo)
-
-
-def sugestoes_funcionarios():
-    """Sugestões de funcionários para busca (nome, matrícula e empresa)."""
-    pares = []
-    for valor in valores_unicos(Funcionario.nome):
-        pares.append((valor, "nome"))
-    for valor in valores_unicos(Funcionario.matricula):
-        pares.append((valor, "matrícula"))
-    for valor in valores_unicos(Funcionario.empresa):
-        pares.append((valor, "empresa"))
-    return pares
-
-
-def resolver_funcionario(texto):
-    """Resolve texto (matrícula, nome ou empresa) para um funcionário.
-
-    Retorna (funcionario, alternativas) — mesma lógica de resolver_item:
-    casou com exatamente um → alternativas vazia; senão, lista candidatos.
-    """
-    texto = (texto or "").strip()
-    if not texto:
-        return None, []
-
-    # A matrícula pode existir em mais de uma empresa; nesse caso devolve
-    # os candidatos como alternativas em vez de escolher um arbitrário.
-    por_matricula = Funcionario.query.filter_by(matricula=texto).all()
-    if len(por_matricula) == 1:
-        return por_matricula[0], []
-    if len(por_matricula) > 1:
-        return None, por_matricula
-
-    exatos = Funcionario.query.filter(
-        db.func.lower(Funcionario.nome) == texto.lower()
-    ).all()
-    if len(exatos) == 1:
-        return exatos[0], []
-
-    contem = (
-        Funcionario.query.filter(
-            db.or_(
-                Funcionario.nome.ilike(f"%{texto}%"),
-                Funcionario.matricula.ilike(f"%{texto}%"),
-                Funcionario.empresa.ilike(f"%{texto}%"),
-            )
-        )
-        .order_by(Funcionario.nome)
-        .limit(12)
-        .all()
-    )
-    if len(contem) == 1:
-        return contem[0], []
-    return None, contem or exatos
 
 
 def resolver_item(texto):
@@ -397,20 +408,9 @@ def resolver_item(texto):
     if len(exatos) == 1:
         return exatos[0], []
 
-    # nome com o tamanho junto ("Camisa Azul P"), como o autocomplete exibe
-    com_tamanho = Item.query.filter(
-        db.func.lower(nome_com_tamanho()) == texto.lower()
-    ).all()
-    if len(com_tamanho) == 1:
-        return com_tamanho[0], []
-    if len(com_tamanho) > 1:
-        return None, com_tamanho
-
     padrao = f"%{texto}%"
     contem = (
-        Item.query.filter(
-            db.or_(Item.nome.ilike(padrao), nome_com_tamanho().ilike(padrao))
-        )
+        Item.query.filter(Item.nome.ilike(padrao))
         .order_by(Item.nome)
         .limit(12)
         .all()

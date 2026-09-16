@@ -30,8 +30,6 @@
           <td class="codigo">{{ item.codigo }}</td>
           <td>
             <span class="{{ 'item-inativo' if not item.ativo }}">{{ item.nome }}</span>
-            {% if item.tamanho %}<span class="badge text-bg-secondary">Tam. {{ item.tamanho }}</span>{% endif %}
-            {% if item.ca %}<span class="badge text-bg-light">CA {{ item.ca }}</span>{% endif %}
           </td>
           <td>{{ item.categoria.nome }}</td>
           <td>{{ UNIDADES[item.unidade] }}</td>

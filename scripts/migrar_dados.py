@@ -30,10 +30,13 @@ TABELAS = [
     "usuario",
     "categoria",
     "item",
-    "funcionario",
     "obra",
+    "setor",
+    "entregador",
     "nota",
+    "remessa",
     "movimentacao",
+    "evento_remessa",
 ]
 
 

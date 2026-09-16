@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% set aba = 'logistica' %}
+{% block titulo %}Registrar recebimento — {{ remessa.codigo }}{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">Registrar recebimento <span class="codigo">{{ remessa.codigo }}</span></h1>
+  <a class="btn btn-outline-secondary" href="{{ url_for('logistica.detalhe', remessa_id=remessa.id) }}">Voltar</a>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4"><span class="text-muted small d-block">OBRA</span><strong>{{ remessa.obra.nome }}</strong></div>
+      <div class="col-md-4"><span class="text-muted small d-block">SETOR</span>{{ remessa.setor.nome }}</div>
+      <div class="col-md-4"><span class="text-muted small d-block">TRANSPORTADOR</span>{{ remessa.transportador.nome }}</div>
+    </div>
+  </div>
+</div>
+
+<form method="post" enctype="multipart/form-data" id="form-recebimento" action="{{ url_for('logistica.receber', remessa_id=remessa.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="assinatura" id="assinatura" value="">
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <label class="form-label" for="recebido_por">Recebido por <span class="text-danger">*</span></label>
+      <input type="text" class="form-control" id="recebido_por" name="recebido_por" maxlength="120" required autofocus>
+      <div class="form-text">Nome de quem recebeu o material na obra.</div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <label class="form-label">Assinatura <span class="text-danger">*</span></label>
+      <canvas id="canvas-assinatura" class="canvas-assinatura" width="520" height="200"></canvas>
+      <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="btn-limpar">Limpar</button>
+      <div class="form-text">Assine com o dedo ou o mouse dentro do quadro.</div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <label class="form-label" for="foto">Foto do recebimento <span class="text-muted">(opcional)</span></label>
+      <input type="file" class="form-control" id="foto" name="foto" accept="image/png,image/jpeg" capture="environment">
+      <div class="form-text">Em celulares, abre a câmera para fotografar o material entregue.</div>
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-primary">Registrar recebimento</button>
+</form>
+
+<script>
+(function () {
+  var canvas = document.getElementById("canvas-assinatura");
+  var ctx = canvas.getContext("2d");
+  var campo = document.getElementById("assinatura");
+  var desenhando = false;
+  var ultimo = null;
+
+  function posicao(e) {
+    var rect = canvas.getBoundingClientRect();
+    var t = e.touches ? e.touches[0] : e;
+    return {
+      x: (t.clientX - rect.left) * (canvas.width / rect.width),
+      y: (t.clientY - rect.top) * (canvas.height / rect.height)
+    };
+  }
+
+  function iniciar(e) {
+    e.preventDefault();
+    desenhando = true;
+    ultimo = posicao(e);
+  }
+
+  function mover(e) {
+    if (!desenhando) return;
+    e.preventDefault();
+    var p = posicao(e);
+    ctx.strokeStyle = "#1d6ab2";
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(ultimo.x, ultimo.y);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    ultimo = p;
+  }
+
+  function terminar() {
+    desenhando = false;
+    ultimo = null;
+  }
+
+  canvas.addEventListener("mousedown", iniciar);
+  canvas.addEventListener("mousemove", mover);
+  window.addEventListener("mouseup", terminar);
+  canvas.addEventListener("touchstart", iniciar, { passive: false });
+  canvas.addEventListener("touchmove", mover, { passive: false });
+  canvas.addEventListener("touchend", terminar);
+
+  document.getElementById("btn-limpar").addEventListener("click", function () {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    campo.value = "";
+  });
+
+  document.getElementById("form-recebimento").addEventListener("submit", function () {
+    campo.value = canvas.toDataURL("image/png");
+  });
+})();
+</script>
+{% endblock %}

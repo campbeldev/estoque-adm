@@ -25,13 +25,15 @@
       <ul class="navbar-nav me-auto">
         <li class="nav-item"><a class="nav-link {% if aba == 'estoque' %}active{% endif %}" href="{{ url_for('estoque.index') }}">Estoque</a></li>
         <li class="nav-item"><a class="nav-link {% if aba == 'pos' %}active{% endif %}" href="{{ url_for('pos.index') }}">Saídas</a></li>
+        <li class="nav-item"><a class="nav-link {% if aba == 'logistica' %}active{% endif %}" href="{{ url_for('logistica.index') }}">Rastreio</a></li>
         <li class="nav-item"><a class="nav-link {% if aba == 'entradas' %}active{% endif %}" href="{{ url_for('entradas.nova') }}">Entradas</a></li>
         {% if usuario_atual.perfil == 'admin' %}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Cadastros</a>
           <ul class="dropdown-menu">
             <li><a class="dropdown-item" href="{{ url_for('itens.listar') }}">Itens</a></li>
-            <li><a class="dropdown-item" href="{{ url_for('cadastros.funcionarios') }}">Funcionários</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('cadastros.entregadores') }}">Entregadores</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('cadastros.setores') }}">Setores</a></li>
             <li><a class="dropdown-item" href="{{ url_for('cadastros.obras') }}">Obras</a></li>
             <li><a class="dropdown-item" href="{{ url_for('usuarios.listar') }}">Usuários</a></li>
           </ul>

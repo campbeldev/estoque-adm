@@ -1,20 +1,31 @@
 {% extends "base.html" %}
-{% from "macros.html" import sugestoes_itens, sugestoes_valores %}
+{% from "macros.html" import sugestoes_itens %}
 {% set aba = 'pos' %}
 {% block titulo %}Saídas{% endblock %}
 
-{% macro destino_campos(obrigar_funcionario=false, obrigar_obra=false) %}
+{% macro destino_campos(obrigatorio=false) %}
 <div class="row g-2">
-  <div class="col-7">
-    <input class="form-control" name="funcionario" {% if obrigar_funcionario %}required{% endif %}
-           placeholder="Funcionário (quem retira)…" list="sugestoes-funcionarios"
-           value="{{ funcionario_texto }}" autocomplete="off" spellcheck="false">
-  </div>
-  <div class="col-5">
-    <select class="form-select" name="obra_id" {% if obrigar_obra %}required{% endif %}>
+  <div class="col-4">
+    <select class="form-select" name="obra_id" {% if obrigatorio %}required{% endif %}>
       <option value="">Obra (destino)…</option>
       {% for o in obras %}
-      <option value="{{ o.id }}" {% if o.id == obra_id %}selected{% endif %}>{{ o.nome }}</option>
+      <option value="{{ o.id }}" {% if o.id == obra_id %}selected{% endif %}>{{ o.nome }}{% if o.eh_sede %} (sede){% endif %}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-4">
+    <select class="form-select" name="setor_id" {% if obrigatorio %}required{% endif %}>
+      <option value="">Setor (área)…</option>
+      {% for s in setores %}
+      <option value="{{ s.id }}" {% if s.id == setor_id %}selected{% endif %}>{{ s.nome }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-4">
+    <select class="form-select" name="entregador_id">
+      <option value="">Entregador (só se não for a sede)…</option>
+      {% for e in entregadores %}
+      <option value="{{ e.id }}" {% if e.id == entregador_id %}selected{% endif %}>{{ e.nome }}</option>
       {% endfor %}
     </select>
   </div>
@@ -22,14 +33,13 @@
 {% endmacro %}
 
 {% block conteudo %}
-{{ sugestoes_valores(sugestoes_funcionarios, 'sugestoes-funcionarios') }}
-{% if not funcionarios or not obras %}
+{% if not setores or not obras %}
 <div class="alert alert-warning">
-  As saídas exigem funcionário e obra cadastrados — falta{% if not funcionarios and not obras %}m funcionários e obras{% elif not funcionarios %}m funcionários{% else %}m obras{% endif %}.
+  As saídas exigem obras e setores cadastrados — falta{% if not setores and not obras %}m obras e setores{% elif not setores %}m setores{% else %}m obras{% endif %}.
   {% if usuario_atual.perfil == 'admin' %}
   Cadastre agora:
-  <a href="{{ url_for('cadastros.funcionarios') }}">Funcionários</a> ·
-  <a href="{{ url_for('cadastros.obras') }}">Obras</a>
+  <a href="{{ url_for('cadastros.obras') }}">Obras</a> ·
+  <a href="{{ url_for('cadastros.setores') }}">Setores</a>
   {% else %}
   Peça ao administrador para cadastrá-los.
   {% endif %}
@@ -52,7 +62,7 @@
               Modo rápido — baixa 1 unidade por leitura
             </label>
           </div>
-          {{ destino_campos(obrigar_funcionario=modo_rapido, obrigar_obra=modo_rapido) }}
+          {{ destino_campos(obrigatorio=modo_rapido) }}
           <button class="btn btn-primary w-100 mt-3" type="submit">
             {% if modo_rapido %}Registrar saída{% else %}Adicionar ao pacote{% endif %}
           </button>
@@ -65,9 +75,10 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="codigo" value="{{ s.codigo }}">
             <input type="hidden" name="modo_rapido" value="{% if modo_rapido %}on{% endif %}">
-            <input type="hidden" name="funcionario" value="{{ funcionario_texto }}">
             <input type="hidden" name="obra_id" value="{{ obra_id if obra_id else '' }}">
-            <button class="btn btn-sm btn-outline-primary mb-1">{{ s.nome }}{% if s.tamanho %} · Tam. {{ s.tamanho }}{% endif %}</button>
+            <input type="hidden" name="setor_id" value="{{ setor_id if setor_id else '' }}">
+            <input type="hidden" name="entregador_id" value="{{ entregador_id if entregador_id else '' }}">
+            <button class="btn btn-sm btn-outline-primary mb-1">{{ s.nome }}</button>
           </form>
           {% endfor %}
         </div>
@@ -103,7 +114,6 @@
                   <td>
                     {{ linha.item.nome }}
                     <div class="text-muted small codigo">{{ linha.item.codigo }}</div>
-                    {% if linha.item.tamanho %}<span class="badge text-bg-secondary">Tam. {{ linha.item.tamanho }}</span>{% endif %}
                   </td>
                   <td>
                     <input class="form-control form-control-sm text-end" type="number" min="0"
@@ -131,7 +141,7 @@
               </tfoot>
             </table>
           </div>
-          {{ destino_campos(obrigar_funcionario=true, obrigar_obra=true) }}
+          {{ destino_campos(obrigatorio=true) }}
           <div class="d-flex gap-2 mt-3">
             <button class="btn btn-outline-secondary" formaction="{{ url_for('pos.atualizar') }}" formnovalidate>Atualizar quantidades</button>
             <button class="btn btn-success flex-grow-1 btn-lg">Confirmar saída</button>

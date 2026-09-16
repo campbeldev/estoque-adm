@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "macros.html" import sugestoes_valores %}
+{% set aba = 'cadastros' %}
+{% block titulo %}Setores{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">Setores</h1>
+  <a class="btn btn-primary" href="{{ url_for('cadastros.setor_novo') }}">+ Novo setor</a>
+</div>
+{{ sugestoes_valores(sugestoes_busca, 'sugestoes-busca-setor') }}
+<form class="row g-2 mb-3" method="get">
+  <div class="col-auto flex-grow-1">
+    <input class="form-control" name="busca" value="{{ busca }}" placeholder="Buscar por nome…"
+           list="sugestoes-busca-setor" autocomplete="off" spellcheck="false">
+  </div>
+  <div class="col-auto"><button class="btn btn-outline-secondary">Buscar</button></div>
+</form>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Setor</th><th></th></tr></thead>
+      <tbody>
+        {% for setor in setores %}
+        <tr>
+          <td>{{ setor.nome }}</td>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('cadastros.setor_editar', setor_id=setor.id) }}">Editar</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="2" class="text-muted text-center py-4">Nenhum setor cadastrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

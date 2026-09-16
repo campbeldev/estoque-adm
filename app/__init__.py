@@ -30,6 +30,7 @@ def create_app(config=None):
     # instance/ guarda o banco; backups/ guarda as cópias de segurança
     os.makedirs(app.instance_path, exist_ok=True)
     os.makedirs(app.config["BACKUP_DIR"], exist_ok=True)
+    os.makedirs(app.config["COMPROVANTES_DIR"], exist_ok=True)
 
     db.init_app(app)
     csrf.init_app(app)
@@ -71,6 +72,7 @@ def create_app(config=None):
         entradas,
         estoque,
         itens,
+        logistica,
         notas,
         pos,
         relatorios,
@@ -86,6 +88,7 @@ def create_app(config=None):
     app.register_blueprint(pos.bp)
     app.register_blueprint(estoque.bp)
     app.register_blueprint(relatorios.bp)
+    app.register_blueprint(logistica.bp)
     app.cli.add_command(seed.seed_command)
     app.cli.add_command(backup.backup_command)
 
