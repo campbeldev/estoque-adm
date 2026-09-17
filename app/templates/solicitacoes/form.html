@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "macros.html" import sugestoes_valores %}
+
+{% block titulo %}Nova solicitação · Controle de Estoque{% endblock %}
+
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Nova solicitação</h1>
+    <p class="text-muted mb-0">Registre o pedido de materiais.</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('solicitacoes.listar') }}">
+    Voltar
+  </a>
+</div>
+
+{{ sugestoes_valores(solicitantes, "sugestoes-solicitantes") }}
+
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label" for="solicitante">Solicitante</label>
+          <input class="form-control" id="solicitante" name="solicitante"
+                 list="sugestoes-solicitantes" autocomplete="off"
+                 spellcheck="false" required>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label" for="obra_id">Obra</label>
+          <select class="form-select" id="obra_id" name="obra_id" required>
+            <option value="">Selecione…</option>
+            {% for obra in obras %}
+            <option value="{{ obra.id }}">{{ obra.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label" for="setor_id">Setor</label>
+          <select class="form-select" id="setor_id" name="setor_id" required>
+            <option value="">Selecione…</option>
+            {% for setor in setores %}
+            <option value="{{ setor.id }}">{{ setor.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">Item solicitado</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-8">
+          <label class="form-label" for="item_id">Item</label>
+          <select class="form-select" id="item_id" name="item_id" required>
+            <option value="">Selecione…</option>
+            {% for item in itens %}
+            <option value="{{ item.id }}">{{ item.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label" for="quantidade">Quantidade</label>
+          <input class="form-control" id="quantidade" name="quantidade"
+                 type="number" min="1" step="1" required>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" type="submit">Registrar solicitação</button>
+</form>
+{% endblock %}

@@ -11,7 +11,7 @@
 
   /* Azul corporativo sóbrio no lugar do azul padrão */
   --bs-primary: #1d6ab2;
-  --bs-secondary: #b00909;
+  --bs-secondary: #141623;
   --bs-primary-rgb: 29, 106, 178;
   --bs-link-color: #1d6ab2;
   --bs-link-color-rgb: 29, 106, 178;
@@ -27,7 +27,7 @@ main.container {
 /* Barra superior escura com filete de destaque */
 .navbar-estoque {
   background-color: #10151c;
-  border-bottom: 3px solid var(--bs-primary);
+  border-bottom: 4px solid var(--bs-secondary);
 }
 
 .navbar-brand {

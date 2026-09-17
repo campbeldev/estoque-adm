@@ -76,8 +76,10 @@ def create_app(config=None):
         notas,
         pos,
         relatorios,
+        solicitacoes,
         seed,
         usuarios,
+        
     )
     app.register_blueprint(auth.bp)
     app.register_blueprint(itens.bp)
@@ -88,6 +90,7 @@ def create_app(config=None):
     app.register_blueprint(pos.bp)
     app.register_blueprint(estoque.bp)
     app.register_blueprint(relatorios.bp)
+    app.register_blueprint(solicitacoes.bp)
     app.register_blueprint(logistica.bp)
     app.cli.add_command(seed.seed_command)
     app.cli.add_command(backup.backup_command)

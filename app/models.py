@@ -132,6 +132,37 @@ class Nota(db.Model):
 
     usuario = db.relationship("Usuario", lazy="joined")
 
+class Solicitacao(db.Model):
+    __tablename__ = "solicitacao"
+
+    id = db.Column(db.Integer, primary_key=True)
+    solicitante = db.Column(db.String(120), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey("obra.id"), nullable=False)
+    setor_id = db.Column(db.Integer, db.ForeignKey("setor.id"), nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuario.id"), nullable=False)
+    data_criacao = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+    obra = db.relationship("Obra", lazy="joined")
+    setor = db.relationship("Setor", lazy="joined")
+    usuario = db.relationship("Usuario", lazy="joined")
+    itens = db.relationship(
+        "ItemSolicitacao",
+        lazy="selectin",
+        order_by="ItemSolicitacao.id",
+        back_populates="solicitacao",
+    )
+  
+class ItemSolicitacao(db.Model):
+    __tablename__ = "item_solicitacao"
+
+    id = db.Column(db.Integer, primary_key=True)
+    solicitacao_id = db.Column(db.Integer, db.ForeignKey("solicitacao.id"), nullable=False)
+    item_id = db.Column(db.Integer, db.ForeignKey("item.id"), nullable=False)
+    quantidade = db.Column(db.Integer, nullable=False)
+
+    solicitacao = db.relationship("Solicitacao", lazy="joined", back_populates="itens")
+    item = db.relationship("Item", lazy="joined")
+
 
 class Remessa(db.Model):
     """A viagem de entrega: um destino (obra + setor) e um transportador.
