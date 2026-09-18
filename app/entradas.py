@@ -8,7 +8,7 @@ O campo de leitura aceita código OU nome do produto; quando o
 nome casar com vários itens, o formulário volta com botões para escolher
 o item correto (sem perder os demais campos digitados).
 """
-from datetime import date, datetime
+from datetime import datetime
 
 from flask import (
     Blueprint,
@@ -57,7 +57,6 @@ def nova():
         "fornecedor": request.form.get("fornecedor", "").strip(),
         "numero_nota": request.form.get("numero_nota", "").strip(),
         "serie": request.form.get("serie", "").strip(),
-        "validade": request.form.get("validade", "").strip(),
         "data": request.form.get("data", "").strip(),
     }
     # Pré-preenche com a última nota registrada — só no GET: no re-render
@@ -128,17 +127,6 @@ def nova():
         if valor_unitario is None or valor_unitario <= 0:
             return _render("Valor unitário inválido — use o formato 12,50.")
 
-        # Validade do lote que está chegando (opcional — nem todo material
-        # de escritório/limpeza/alojamento tem vencimento).
-        validade_str = form_data["validade"]
-        if validade_str:
-            try:
-                validade = date.fromisoformat(validade_str)
-            except ValueError:
-                return _render("Data de validade inválida.")
-        else:
-            validade = None
-
         if form_data["data"]:
             try:
                 data_entrada = datetime.combine(
@@ -185,7 +173,6 @@ def nova():
                 usuario_id=g.usuario.id,
                 nota_id=nota.id,
                 valor_unitario_cents=valor_unitario,
-                validade=validade,
                 fornecedor=fornecedor,
                 nota_fiscal=numero,
                 data=data_entrada,
@@ -197,15 +184,12 @@ def nova():
             "serie": serie,
             "fornecedor": fornecedor,
         }
-        detalhe_validade = (
-            f" — val. {validade.strftime('%d/%m/%Y')}" if validade else ""
-        )
         flash(
             f"Entrada registrada: {item.nome} — "
             f"{quantidade} {UNIDADES_EXIBICAO[item.unidade]} × "
             f"{formatar_moeda(valor_unitario)} = "
             f"{formatar_moeda(quantidade * valor_unitario)} "
-            f"(nota {numero}/{serie}){detalhe_validade}.",
+            f"(nota {numero}/{serie}).",
             "success",
         )
         return redirect(url_for("entradas.nova"))

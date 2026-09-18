@@ -3,8 +3,6 @@ import base64
 import os
 import tempfile
 import unittest
-from datetime import date
-
 from werkzeug.security import generate_password_hash
 
 from app import create_app, db
@@ -20,7 +18,6 @@ from app.models import (
     Setor,
     Usuario,
     saldo_do_item,
-    saldos_por_lote,
 )
 
 
@@ -105,7 +102,6 @@ class BaseTeste(unittest.TestCase):
             "numero_nota": "NF-0001",
             "serie": "1",
             "valor_unitario": "12,50",
-            "validade": "2030-06-15",  # validade do lote (opcional)
             "data": "",
         }
         dados.update(extras)
@@ -861,61 +857,6 @@ class TesteMigracao(BaseTeste):
             with app.app_context():
                 db.session.remove()
                 db.engine.dispose()
-
-
-class TesteValidade(BaseTeste):
-    def test_entrada_com_validade_explicita(self):
-        self.logar()
-        self.criar_item()
-        self.dar_entrada(item_id=1, validade="2027-01-01")
-        with self.app.app_context():
-            mov = Movimentacao.query.filter_by(tipo="entrada").first()
-            self.assertEqual(mov.validade, date(2027, 1, 1))
-
-    def test_entrada_com_validade_invalida_bloqueia(self):
-        self.logar()
-        self.criar_item()
-        resposta = self.dar_entrada(item_id=1, validade="xx/yy/zzzz")
-        self.assertIn("Data de validade inválida".encode(), resposta.data)
-        with self.app.app_context():
-            self.assertEqual(Movimentacao.query.count(), 0)
-
-    def test_saldos_por_lote_fifo(self):
-        """PEPS: o lote mais antigo é consumido primeiro pelas saídas."""
-        self.logar()
-        self.criar_item()
-        with self.app.app_context():
-            db.session.add_all(
-                [
-                    Movimentacao(
-                        tipo="entrada", quantidade=10, item_id=1,
-                        usuario_id=1, validade=date(2026, 1, 1),
-                    ),
-                    Movimentacao(
-                        tipo="saida", quantidade=7, item_id=1,
-                        usuario_id=1, valor_unitario_cents=100,
-                    ),
-                    Movimentacao(
-                        tipo="entrada", quantidade=5, item_id=1,
-                        usuario_id=1, validade=date(2027, 1, 1),
-                    ),
-                ]
-            )
-            db.session.commit()
-            lotes = saldos_por_lote([1])[1]
-            self.assertEqual(
-                [(l["validade"], l["qtd"]) for l in lotes["lotes"]],
-                [(date(2026, 1, 1), 3), (date(2027, 1, 1), 5)],
-            )
-            self.assertEqual(lotes["sem_validade"], 0)
-
-    def test_estoque_mostra_vencimentos(self):
-        self.logar()
-        self.criar_item()
-        self.dar_entrada(item_id=1, quantidade=5, validade="2020-01-01")
-        resposta = self.cliente.get("/estoque/")
-        self.assertIn("5 × 01/01/2020".encode(), resposta.data)
-        self.assertIn("VENCIDO".encode(), resposta.data)
 
 
 class TesteUI(BaseTeste):

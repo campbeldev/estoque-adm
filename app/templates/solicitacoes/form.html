@@ -53,12 +53,18 @@
   </div>
 
   <div class="card mb-3">
-    <div class="card-header">Item solicitado</div>
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Itens solicitados</span>
+      <button class="btn btn-sm btn-outline-primary" id="adicionar-item" type="button">
+        + Adicionar item
+      </button>
+    </div>
     <div class="card-body">
-      <div class="row g-3">
+      <div id="linhas-itens">
+      <div class="row g-3 mb-3" data-linha-item>
         <div class="col-md-8">
-          <label class="form-label" for="item_id">Item</label>
-          <select class="form-select" id="item_id" name="item_id" required>
+          <label class="form-label">Item</label>
+          <select class="form-select" name="item_id" required>
             <option value="">Selecione…</option>
             {% for item in itens %}
             <option value="{{ item.id }}">{{ item.nome }}</option>
@@ -67,14 +73,64 @@
         </div>
 
         <div class="col-md-4">
-          <label class="form-label" for="quantidade">Quantidade</label>
-          <input class="form-control" id="quantidade" name="quantidade"
+          <label class="form-label">Quantidade</label>
+          <input class="form-control" name="quantidade"
                  type="number" min="1" step="1" required>
         </div>
+      </div>
       </div>
     </div>
   </div>
 
   <button class="btn btn-primary" type="submit">Registrar solicitação</button>
 </form>
+<template id="modelo-linha-item">
+  <div class="row g-3 mb-3" data-linha-item>
+    <div class="col-md-8">
+      <label class="form-label">Item</label>
+      <select class="form-select" name="item_id" required>
+        <option value="">Selecione…</option>
+        {% for item in itens %}
+        <option value="{{ item.id }}">{{ item.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Quantidade</label>
+      <input class="form-control" name="quantidade" type="number" min="1" step="1" required>
+    </div>
+    <div class="col-md-1 d-flex align-items-end">
+      <button class="btn btn-outline-danger" type="button" data-remover-item>×</button>
+    </div>
+  </div>
+</template>
+<script>
+(function () {
+  const lista = document.getElementById("linhas-itens");
+  const modelo = document.getElementById("modelo-linha-item");
+  const adicionar = document.getElementById("adicionar-item");
+
+  function atualizarBotoes() {
+    const botoes = lista.querySelectorAll("[data-remover-item]");
+    botoes.forEach(function (botao) {
+      botao.disabled = botoes.length === 1;
+    });
+  }
+
+  adicionar.addEventListener("click", function () {
+    lista.appendChild(modelo.content.cloneNode(true));
+    atualizarBotoes();
+  });
+
+  lista.addEventListener("click", function (evento) {
+    const botao = evento.target.closest("[data-remover-item]");
+    if (botao && !botao.disabled) {
+      botao.closest("[data-linha-item]").remove();
+      atualizarBotoes();
+    }
+  });
+
+  atualizarBotoes();
+})();
+</script>
 {% endblock %}

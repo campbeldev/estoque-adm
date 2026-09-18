@@ -1,6 +1,4 @@
 """Visão do estoque atual e ajustes de balanço."""
-from datetime import date
-
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
 from . import db
@@ -10,15 +8,10 @@ from .models import (
     Movimentacao,
     opcoes_autocomplete,
     saldos_por_item,
-    saldos_por_lote,
     valores_unicos,
 )
 
 bp = Blueprint("estoque", __name__, url_prefix="/estoque")
-
-# Lotes com vencimento daqui a poucos dias ganham destaque amarelo
-DIAS_ALERTA_VENCIMENTO = 60
-
 
 @bp.route("/")
 @login_required
@@ -35,21 +28,10 @@ def index():
         )
     itens = query.order_by(Item.nome).all()
     saldos = saldos_por_item()
-    lotes = saldos_por_lote()
-    hoje = date.today()
-    vencidos = {
-        item_id: any(
-            lote["validade"] < hoje for lote in info["lotes"]
-        )
-        for item_id, info in lotes.items()
-    }
     return render_template(
         "estoque/index.html",
         itens=itens,
         saldos=saldos,
-        lotes=lotes,
-        vencidos=vencidos,
-        dias_alerta=DIAS_ALERTA_VENCIMENTO,
         busca=busca,
         autocomplete=opcoes_autocomplete(),
     )

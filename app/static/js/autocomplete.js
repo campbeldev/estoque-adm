@@ -96,7 +96,9 @@
     // remove o atributo para o navegador não abrir o dropdown nativo junto
     input.removeAttribute("list");
     // suprime o autocomplete/histórico do navegador e a correção ortográfica
-    input.setAttribute("autocomplete", "off");
+    // Alguns navegadores ignoram "off" em campos de texto e exibem histórico.
+    // new-password impede essa lista sem interferir no dropdown da plataforma.
+    input.setAttribute("autocomplete", "new-password");
     input.setAttribute("spellcheck", "false");
     input.setAttribute("autocapitalize", "off");
 

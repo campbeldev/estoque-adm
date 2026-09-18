@@ -2,7 +2,7 @@
  * Quando um arquivo estático mudar, aumente o número em CACHE para os
  * navegadores baixarem a versão nova.
  */
-var CACHE = "estoque-v7";
+var CACHE = "estoque-v8";
 
 var ESTATICOS = [
   "/static/vendor/bootstrap.min.css",

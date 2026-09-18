@@ -9,9 +9,51 @@
     <p class="text-muted mb-0">Pedidos de materiais registrados no sistema.</p>
   </div>
 </div>
-  <a class="btn btn-primary" href="{{ url_for('solicitacoes.nova') }}">
-    + Nova solicitação
-  </a>
+  <div class="mb-3">
+    <a class="btn btn-primary" href="{{ url_for('solicitacoes.nova') }}">
+      + Nova solicitação
+    </a>
+  </div>
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-4">
+    <input class="form-control" name="busca" value="{{ busca }}"
+           placeholder="Buscar solicitante…" autocomplete="off" spellcheck="false">
+  </div>
+  <div class="col-md-2">
+    <select class="form-select" name="status">
+      <option value="">Todos os status</option>
+      {% for opcao in status_opcoes %}
+      <option value="{{ opcao }}" {% if status == opcao %}selected{% endif %}>
+        {{ opcao }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select class="form-select" name="obra_id">
+      <option value="">Todas as obras</option>
+      {% for obra in obras %}
+      <option value="{{ obra.id }}" {% if obra_id == obra.id %}selected{% endif %}>
+        {{ obra.nome }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select class="form-select" name="setor_id">
+      <option value="">Todos os setores</option>
+      {% for setor in setores %}
+      <option value="{{ setor.id }}" {% if setor_id == setor.id %}selected{% endif %}>
+        {{ setor.nome }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2 d-flex gap-2">
+    <button class="btn btn-outline-secondary flex-grow-1" type="submit">Buscar</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('solicitacoes.listar') }}">Limpar</a>
+  </div>
+</form>
 {% if solicitacoes %}
 <div class="table-responsive">
   <table class="table table-hover align-middle">
@@ -22,17 +64,37 @@
         <th>Obra</th>
         <th>Setor</th>
         <th>Itens</th>
+        <th>Status</th>
         <th>Registrado por</th>
       </tr>
     </thead>
     <tbody>
       {% for solicitacao in solicitacoes %}
-      <tr>
+      <tr class="solicitacao-linha"
+          data-href="{{ url_for('solicitacoes.detalhe', solicitacao_id=solicitacao.id) }}"
+          role="link" tabindex="0">
         <td>{{ formatar_data_hora(solicitacao.data_criacao) }}</td>
         <td>{{ solicitacao.solicitante }}</td>
         <td>{{ solicitacao.obra.nome }}</td>
         <td>{{ solicitacao.setor.nome }}</td>
         <td>{{ solicitacao.itens|length }}</td>
+        <td>
+          <span class="badge
+            {% if solicitacao.status_exibicao == 'Parcialmente atendida' %}
+              text-bg-warning text-dark
+            {% elif solicitacao.status_exibicao == 'Atendida' %}
+              text-bg-success
+            {% elif solicitacao.status_exibicao == 'Recusada' %}
+              text-bg-danger
+            {% else %}
+              text-bg-secondary
+            {% endif %}">
+            {{ solicitacao.status_exibicao }}
+          </span>
+          <small class="text-muted">
+            {{ solicitacao.itens_atendidos }}/{{ solicitacao.total_itens }} completos
+          </small>
+        </td>
         <td>{{ solicitacao.usuario.nome }}</td>
       </tr>
       {% endfor %}
@@ -44,4 +106,21 @@
   Nenhuma solicitação registrada ainda.
 </div>
 {% endif %}
+<script>
+(function () {
+  document.querySelectorAll(".solicitacao-linha").forEach(function (linha) {
+    function abrir() {
+      window.location.href = linha.dataset.href;
+    }
+
+    linha.addEventListener("click", abrir);
+    linha.addEventListener("keydown", function (evento) {
+      if (evento.key === "Enter" || evento.key === " ") {
+        evento.preventDefault();
+        abrir();
+      }
+    });
+  });
+})();
+</script>
 {% endblock %}

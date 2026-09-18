@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 
 from . import db
 from .auth import admin_required
-from .models import Entregador, Obra, Setor, valores_unicos
+from .models import Entregador, Movimentacao, Obra, Remessa, Setor, Solicitacao, valores_unicos
 
 bp = Blueprint("cadastros", __name__)
 
@@ -163,6 +163,28 @@ def setor_editar(setor_id):
                 flash("Setor atualizado.", "success")
                 return redirect(url_for("cadastros.setores"))
     return render_template("cadastros/setor_form.html", setor=setor)
+
+
+@bp.route("/setores/<int:setor_id>/excluir", methods=["POST"])
+@admin_required
+def setor_excluir(setor_id):
+    setor = db.get_or_404(Setor, setor_id)
+    usos = (
+        Solicitacao.query.filter_by(setor_id=setor.id).count()
+        + Remessa.query.filter_by(setor_id=setor.id).count()
+        + Movimentacao.query.filter_by(setor_id=setor.id).count()
+    )
+    if usos:
+        flash(
+            "Não é possível excluir este setor porque ele já está em uso "
+            "por solicitações, remessas ou movimentações.",
+            "warning",
+        )
+    else:
+        db.session.delete(setor)
+        db.session.commit()
+        flash(f"Setor excluído: {setor.nome}.", "success")
+    return redirect(url_for("cadastros.setores"))
 
 
 # -------------------------------- Obras ---------------------------------

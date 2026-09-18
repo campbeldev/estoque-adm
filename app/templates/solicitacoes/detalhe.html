@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block titulo %}Solicitação #{{ solicitacao.id }} · Controle de Estoque{% endblock %}
+
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Solicitação #{{ solicitacao.id }}</h1>
+    <p class="text-muted mb-0">
+      Registrada em {{ formatar_data_hora(solicitacao.data_criacao) }}
+    </p>
+  </div>
+
+  <div class="d-flex gap-2">
+    {% if solicitacao.status_exibicao in ["Pendente", "Parcialmente atendida"] %}
+    <a class="btn btn-primary"
+       href="{{ url_for('solicitacoes.emitir_saida', solicitacao_id=solicitacao.id) }}">
+      Emitir saída
+    </a>
+    {% endif %}
+    {% if solicitacao.etapa == "pendente" %}
+    <div class="dropdown">
+      <button class="btn btn-outline-secondary dropdown-toggle" type="button"
+              data-bs-toggle="dropdown" aria-expanded="false">
+        Ações
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li>
+          <button class="dropdown-item text-danger" type="button"
+                  data-bs-toggle="modal" data-bs-target="#modal-recusar">
+            Recusar solicitação
+          </button>
+        </li>
+        <li>
+          <button class="dropdown-item" type="button"
+                  data-bs-toggle="modal" data-bs-target="#modal-cancelar">
+            Cancelar solicitação
+          </button>
+        </li>
+      </ul>
+    </div>
+    {% endif %}
+    <a class="btn btn-outline-secondary"
+       href="{{ url_for('solicitacoes.listar') }}">
+      Voltar
+    </a>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <strong>Solicitante</strong>
+        <div>{{ solicitacao.solicitante }}</div>
+      </div>
+
+      <div class="col-md-3">
+        <strong>Obra</strong>
+        <div>{{ solicitacao.obra.nome }}</div>
+      </div>
+
+      <div class="col-md-3">
+        <strong>Setor</strong>
+        <div>{{ solicitacao.setor.nome }}</div>
+      </div>
+
+      <div class="col-md-3">
+        <strong>Status</strong>
+        <div>
+          <span class="badge
+            {% if solicitacao.status_exibicao == 'Parcialmente atendida' %}
+              text-bg-warning text-dark
+            {% elif solicitacao.status_exibicao == 'Atendida' %}
+              text-bg-success
+            {% elif solicitacao.status_exibicao == 'Recusada' %}
+              text-bg-danger
+            {% else %}
+              text-bg-secondary
+            {% endif %}">
+            {{ solicitacao.status_exibicao }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if solicitacao.etapa == "pendente" %}
+<div class="modal fade" id="modal-recusar" tabindex="-1"
+     aria-labelledby="modal-recusar-titulo" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="modal-recusar-titulo">
+          Recusar solicitação
+        </h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                aria-label="Fechar"></button>
+      </div>
+      <form method="post"
+            action="{{ url_for('solicitacoes.recusar', solicitacao_id=solicitacao.id) }}">
+        <div class="modal-body">
+          <label class="form-label" for="motivo-recusar">Motivo da recusa</label>
+          <textarea class="form-control" id="motivo-recusar" name="motivo"
+                    rows="3" required></textarea>
+        </div>
+        <div class="modal-footer">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="button" class="btn btn-outline-secondary"
+                  data-bs-dismiss="modal">Voltar</button>
+          <button class="btn btn-danger" type="submit">Confirmar recusa</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-cancelar" tabindex="-1"
+     aria-labelledby="modal-cancelar-titulo" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="modal-cancelar-titulo">
+          Cancelar solicitação
+        </h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                aria-label="Fechar"></button>
+      </div>
+      <form method="post"
+            action="{{ url_for('solicitacoes.cancelar', solicitacao_id=solicitacao.id) }}">
+        <div class="modal-body">
+          <label class="form-label" for="motivo-cancelar">
+            Motivo do cancelamento
+          </label>
+          <textarea class="form-control" id="motivo-cancelar" name="motivo"
+                    rows="3" required></textarea>
+        </div>
+        <div class="modal-footer">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="button" class="btn btn-outline-secondary"
+                  data-bs-dismiss="modal">Voltar</button>
+          <button class="btn btn-secondary" type="submit">
+            Confirmar cancelamento
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% elif solicitacao.etapa in ["recusada", "cancelada"] %}
+<div class="alert alert-warning">
+  <strong>Motivo do encerramento:</strong>
+  {{ solicitacao.motivo_encerramento }}
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header">Itens solicitados</div>
+
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Pedido</th>
+          <th>Atendido</th>
+          <th>Restante</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item_solicitado in solicitacao.itens %}
+        <tr>
+          <td>{{ item_solicitado.item.nome }}</td>
+          <td>{{ item_solicitado.quantidade }}</td>
+          <td>{{ item_solicitado.quantidade_atendida }}</td>
+          <td>{{ item_solicitado.quantidade_restante }}</td>
+          <td>
+            {% if item_solicitado.atendido %}
+            <span class="badge text-bg-success">Atendido</span>
+            {% else %}
+            <span class="badge text-bg-warning text-dark">Pendente</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

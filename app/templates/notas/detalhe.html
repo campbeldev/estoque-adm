@@ -23,7 +23,7 @@
       <thead>
         <tr>
           <th>Item</th><th class="text-end">Qtd</th><th>Un.</th>
-          <th>Validade</th><th class="text-end">Valor unit.</th><th class="text-end">Total</th>
+          <th class="text-end">Valor unit.</th><th class="text-end">Total</th>
         </tr>
       </thead>
       <tbody>
@@ -32,18 +32,17 @@
           <td>{{ mov.item.nome }} <span class="text-muted small codigo">{{ mov.item.codigo }}</span></td>
           <td class="text-end">{{ mov.quantidade }}</td>
           <td>{{ UNIDADES[mov.item.unidade] }}</td>
-          <td class="text-nowrap">{{ formatar_data(mov.validade) }}</td>
           <td class="text-end text-nowrap">{{ formatar_moeda(mov.valor_unitario_cents) }}</td>
           <td class="text-end text-nowrap">{{ formatar_moeda(mov.quantidade * (mov.valor_unitario_cents or 0)) }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="6" class="text-muted text-center py-4">Nenhum item vinculado a esta nota.</td></tr>
+        <tr><td colspan="5" class="text-muted text-center py-4">Nenhum item vinculado a esta nota.</td></tr>
         {% endfor %}
       </tbody>
       {% if movs %}
       <tfoot>
         <tr class="table-light">
-          <th colspan="5" class="text-end">Total da nota</th>
+          <th colspan="4" class="text-end">Total da nota</th>
           <th class="text-end text-nowrap">{{ formatar_moeda(total) }}</th>
         </tr>
       </tfoot>

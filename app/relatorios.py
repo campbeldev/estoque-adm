@@ -19,7 +19,7 @@ bp = Blueprint("relatorios", __name__, url_prefix="/relatorios")
 
 CABECALHOS = [
     "Data", "Tipo", "Item", "Quantidade", "Unidade", "Setor",
-    "Obra", "Usuario", "Fornecedor", "Nota", "Observacao", "Validade",
+    "Obra", "Usuario", "Fornecedor", "Nota", "Observacao",
     "Valor Unitario", "Valor Total",
 ]
 
@@ -75,7 +75,6 @@ def _linha_csv(mov):
         mov.fornecedor or "",
         mov.nota_rotulo,
         mov.observacao or "",
-        mov.validade.strftime("%d/%m/%Y") if mov.validade else "",
         formatar_moeda(mov.valor_unitario_cents) if tem_valor else "",
         formatar_moeda(mov.quantidade * mov.valor_unitario_cents)
         if tem_valor

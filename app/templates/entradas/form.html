@@ -16,7 +16,7 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="mb-3">
             <label class="form-label">Código ou nome do produto</label>
-            <input class="form-control input-leitura" name="codigo" autofocus autocomplete="off"
+            <input class="form-control input-leitura" name="codigo" autofocus autocomplete="new-password"
                    placeholder="Digite o nome ou código" value="{{ form_data.codigo }}"
                    list="sugestoes-itens" spellcheck="false">
           </div>
@@ -42,11 +42,6 @@
               <input class="form-control" type="text" inputmode="decimal" name="valor_unitario"
                      value="{{ form_data.valor_unitario }}" placeholder="0,00" required>
               <div class="form-text">Vírgula ou ponto.</div>
-            </div>
-            <div class="col-3">
-              <label class="form-label">Validade (lote)</label>
-              <input class="form-control" type="date" name="validade" value="{{ form_data.validade }}">
-              <div class="form-text">Opcional.</div>
             </div>
             <div class="col-3">
               <label class="form-label">Data</label>
@@ -82,7 +77,7 @@
       <div class="table-responsive">
         <table class="table table-sm table-hover mb-0">
           <thead>
-            <tr><th>Data</th><th>Item</th><th class="text-end">Qtd</th><th>Nota</th><th>Fornecedor</th><th>Val.</th><th class="text-end">Valor unit.</th><th class="text-end">Total</th><th>Usuário</th></tr>
+            <tr><th>Data</th><th>Item</th><th class="text-end">Qtd</th><th>Nota</th><th>Fornecedor</th><th class="text-end">Valor unit.</th><th class="text-end">Total</th><th>Usuário</th></tr>
           </thead>
           <tbody>
             {% for mov in recentes %}
@@ -92,13 +87,12 @@
               <td class="text-end">{{ mov.quantidade }}</td>
               <td>{{ mov.nota_rotulo or '—' }}</td>
               <td>{{ mov.fornecedor or '—' }}</td>
-              <td class="text-nowrap">{{ formatar_data(mov.validade) }}</td>
               <td class="text-end text-nowrap">{{ formatar_moeda(mov.valor_unitario_cents) }}</td>
               <td class="text-end text-nowrap">{{ formatar_moeda(mov.quantidade * (mov.valor_unitario_cents or 0)) }}</td>
               <td>{{ mov.usuario.nome }}</td>
             </tr>
             {% else %}
-            <tr><td colspan="9" class="text-muted text-center py-4">Nenhuma entrada registrada ainda.</td></tr>
+            <tr><td colspan="8" class="text-muted text-center py-4">Nenhuma entrada registrada ainda.</td></tr>
             {% endfor %}
           </tbody>
         </table>

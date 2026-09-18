@@ -7,9 +7,10 @@ from . import db
 from .models import Categoria, Entregador, Item, Obra, Setor, Usuario
 
 CATEGORIAS_PADRAO = [
-    "Material de Escritório",
-    "Material de Limpeza",
-    "Alojamento",
+    "Descartáveis",
+    "Escritório",
+    "Patrimônio",
+    "Higiene",
     "Outros",
 ]
 
@@ -70,10 +71,36 @@ def _semear_usuarios():
 
 def _semear_categorias():
     novas = 0
+    legadas = {
+        "Material de Escritório": "Escritório",
+        "Material de Limpeza": "Higiene",
+        "Alojamento": "Patrimônio",
+        "EPI": "Outros",
+        "Ferramenta": "Outros",
+        "Material de Consumo": "Outros",
+        "Uniforme": "Outros",
+    }
+    categorias = {categoria.nome: categoria for categoria in Categoria.query.all()}
+
     for nome in CATEGORIAS_PADRAO:
-        if Categoria.query.filter_by(nome=nome).first() is None:
-            db.session.add(Categoria(nome=nome))
+        if nome not in categorias:
+            categoria = Categoria(nome=nome)
+            db.session.add(categoria)
+            categorias[nome] = categoria
             novas += 1
+
+    db.session.flush()
+
+    for nome_legado, nome_novo in legadas.items():
+        categoria_legada = categorias.get(nome_legado)
+        if categoria_legada is None:
+            continue
+        categoria_nova = categorias[nome_novo]
+        Item.query.filter_by(categoria_id=categoria_legada.id).update(
+            {Item.categoria_id: categoria_nova.id}, synchronize_session=False
+        )
+        db.session.delete(categoria_legada)
+
     return novas
 
 
@@ -91,15 +118,15 @@ def _semear_exemplos():
     if Item.query.first() is not None:
         return False
 
-    escritorio = Categoria.query.filter_by(nome="Material de Escritório").first()
-    limpeza = Categoria.query.filter_by(nome="Material de Limpeza").first()
-    alojamento = Categoria.query.filter_by(nome="Alojamento").first()
+    escritorio = Categoria.query.filter_by(nome="Escritório").first()
+    higiene = Categoria.query.filter_by(nome="Higiene").first()
+    patrimonio = Categoria.query.filter_by(nome="Patrimônio").first()
 
     _criar_item("Papel Sulfite A4", escritorio, "cx", minimo=20)
     _criar_item("Caneta Esferográfica Azul", escritorio, "cx", minimo=10)
-    _criar_item("Detergente Neutro", limpeza, "un", minimo=30)
-    _criar_item("Sabão em Pó", limpeza, "cx", minimo=15)
-    _criar_item("Lençol de Solteiro", alojamento, "un", minimo=10)
+    _criar_item("Detergente Neutro", higiene, "un", minimo=30)
+    _criar_item("Sabão em Pó", higiene, "cx", minimo=15)
+    _criar_item("Lençol de Solteiro", patrimonio, "un", minimo=10)
 
     db.session.add(Obra(nome="Sede", eh_sede=True))
     db.session.add(Obra(nome="Edifício Central"))

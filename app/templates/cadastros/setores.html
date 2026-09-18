@@ -25,6 +25,11 @@
           <td>{{ setor.nome }}</td>
           <td class="text-end text-nowrap">
             <a class="btn btn-sm btn-outline-primary" href="{{ url_for('cadastros.setor_editar', setor_id=setor.id) }}">Editar</a>
+            <button class="btn btn-sm btn-outline-danger" type="button"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modal-excluir-setor-{{ setor.id }}">
+              Excluir
+            </button>
           </td>
         </tr>
         {% else %}
@@ -34,4 +39,34 @@
     </table>
   </div>
 </div>
+{% for setor in setores %}
+<div class="modal fade" id="modal-excluir-setor-{{ setor.id }}" tabindex="-1"
+     aria-labelledby="modal-excluir-setor-titulo-{{ setor.id }}" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="modal-excluir-setor-titulo-{{ setor.id }}">
+          Excluir setor
+        </h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                aria-label="Fechar"></button>
+      </div>
+      <form method="post" action="{{ url_for('cadastros.setor_excluir', setor_id=setor.id) }}">
+        <div class="modal-body">
+          Confirma a exclusão do setor <strong>{{ setor.nome }}</strong>?
+          <div class="form-text mt-2">
+            A exclusão só será permitida se o setor ainda não tiver uso.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="button" class="btn btn-outline-secondary"
+                  data-bs-dismiss="modal">Voltar</button>
+          <button class="btn btn-danger" type="submit">Excluir setor</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
 {% endblock %}

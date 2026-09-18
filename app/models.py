@@ -3,7 +3,6 @@
 Regra de ouro: o saldo de um item NUNCA é salvo — ele é sempre derivado
 da soma das movimentações (entrada +, saída −, ajuste com sinal).
 """
-from collections import defaultdict
 from datetime import datetime
 
 from sqlalchemy import case, func
@@ -15,6 +14,7 @@ UNIDADES_EXIBICAO = {"un": "un", "pc": "pç", "cx": "cx"}
 TIPOS_EXIBICAO = {"entrada": "Entrada", "saida": "Saída", "ajuste": "Ajuste"}
 
 PERFIS = ("admin", "operador")
+ETAPAS_SOLICITACAO = ("pendente", "recusada", "cancelada")
 
 
 class Usuario(db.Model):
@@ -75,8 +75,7 @@ class Item(db.Model):
     # (ex.: kg de cimento), migrar para Numeric junto com o PostgreSQL
     estoque_minimo = db.Column(db.Integer, nullable=False, default=0)
     codigo = db.Column(db.String(30), nullable=False, unique=True)
-    # A validade é do LOTE que chega (Movimentacao.validade), não do cadastro.
-    # Colunas legadas do estoque-rh (tamanho/uniforme, ca/EPI) ficam órfãs em
+    # Colunas legadas do estoque-rh (tamanho/uniforme, validade, ca/EPI) ficam órfãs em
     # bancos antigos — a migração só adiciona, nunca destrói.
     ativo = db.Column(db.Boolean, nullable=False, default=True)
     data_criacao = db.Column(db.DateTime, nullable=False, default=datetime.now)
@@ -142,15 +141,43 @@ class Solicitacao(db.Model):
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuario.id"), nullable=False)
     data_criacao = db.Column(db.DateTime, nullable=False, default=datetime.now)
 
+    etapa = db.Column(db.String(20), nullable=False, default="pendente")
+    motivo_encerramento = db.Column(db.String(255))
+    data_encerramento = db.Column(db.DateTime)
+    usuario_encerramento_id = db.Column(db.Integer, db.ForeignKey("usuario.id"))
+
     obra = db.relationship("Obra", lazy="joined")
     setor = db.relationship("Setor", lazy="joined")
-    usuario = db.relationship("Usuario", lazy="joined")
+    usuario = db.relationship("Usuario", lazy="joined", foreign_keys=[usuario_id])
+    usuario_encerramento = db.relationship(
+        "Usuario", lazy="joined", foreign_keys=[usuario_encerramento_id]
+    )
     itens = db.relationship(
         "ItemSolicitacao",
         lazy="selectin",
         order_by="ItemSolicitacao.id",
         back_populates="solicitacao",
     )
+
+    @property
+    def status_exibicao(self):
+        if self.etapa == "recusada":
+            return "Recusada"
+        if self.etapa == "cancelada":
+            return "Cancelada"
+        if self.itens and all(item.atendido for item in self.itens):
+            return "Atendida"
+        if any(item.quantidade_atendida > 0 for item in self.itens):
+            return "Parcialmente atendida"
+        return "Pendente"
+
+    @property
+    def itens_atendidos(self):
+        return sum(1 for item in self.itens if item.atendido)
+
+    @property
+    def total_itens(self):
+        return len(self.itens)
   
 class ItemSolicitacao(db.Model):
     __tablename__ = "item_solicitacao"
@@ -162,6 +189,25 @@ class ItemSolicitacao(db.Model):
 
     solicitacao = db.relationship("Solicitacao", lazy="joined", back_populates="itens")
     item = db.relationship("Item", lazy="joined")
+    movimentacoes = db.relationship(
+        "Movimentacao", lazy="selectin", back_populates="item_solicitacao"
+    )
+
+    @property
+    def quantidade_atendida(self):
+        return sum(
+            movimentacao.quantidade
+            for movimentacao in self.movimentacoes
+            if movimentacao.tipo == "saida"
+        )
+
+    @property
+    def quantidade_restante(self):
+        return max(0, self.quantidade - self.quantidade_atendida)
+
+    @property
+    def atendido(self):
+        return self.quantidade_restante == 0
 
 
 class Remessa(db.Model):
@@ -241,6 +287,7 @@ class Movimentacao(db.Model):
         db.Index("ix_movimentacao_item", "item_id"),
         db.Index("ix_movimentacao_tipo", "tipo"),
         db.Index("ix_movimentacao_remessa", "remessa_id"),
+        db.Index("ix_movimentacao_item_solicitacao", "item_solicitacao_id"),
         db.CheckConstraint(
             "tipo IN ('entrada', 'saida', 'ajuste')", name="ck_movimentacao_tipo"
         ),
@@ -256,13 +303,15 @@ class Movimentacao(db.Model):
     obra_id = db.Column(db.Integer, db.ForeignKey("obra.id"))  # destino (saída)
     setor_id = db.Column(db.Integer, db.ForeignKey("setor.id"))  # área do destino (saída)
     remessa_id = db.Column(db.Integer, db.ForeignKey("remessa.id"))  # logística (saída)
+    item_solicitacao_id = db.Column(
+        db.Integer, db.ForeignKey("item_solicitacao.id")
+    )
     # Legado (deprecado): as entradas novas gravam fornecedor/nota_fiscal
     # como cópia para exibição, mas a fonte canônica é a Nota.
     fornecedor = db.Column(db.String(120))  # entrada
     nota_fiscal = db.Column(db.String(30))  # entrada
     nota_id = db.Column(db.Integer, db.ForeignKey("nota.id"))  # entrada
     valor_unitario_cents = db.Column(db.Integer)  # entrada; centavos
-    validade = db.Column(db.Date)  # entrada; vencimento do lote que chegou
     observacao = db.Column(db.String(255))  # motivo do ajuste
     data = db.Column(
         db.DateTime, nullable=False, default=datetime.now, index=True
@@ -273,6 +322,9 @@ class Movimentacao(db.Model):
     obra = db.relationship("Obra", lazy="joined")
     setor = db.relationship("Setor", lazy="joined")
     remessa = db.relationship("Remessa", lazy="joined")
+    item_solicitacao = db.relationship(
+        "ItemSolicitacao", lazy="joined", back_populates="movimentacoes"
+    )
     nota = db.relationship("Nota", lazy="joined")
 
     @property
@@ -334,66 +386,6 @@ def custos_medios_por_item(item_ids=None):
         for item_id, total, quantidade in query.all()
         if total is not None and quantidade
     }
-
-
-def saldos_por_lote(item_ids=None):
-    """Saldo por lote de validade (PEPS — primeiro que vence, primeiro que sai).
-
-    Cada entrada com validade forma um lote; as saídas e os ajustes
-    negativos consomem os lotes na ordem de vencimento. O que o consumo
-    não cobrir vem de unidades sem validade (ajustes positivos e entradas
-    sem data). Retorna:
-
-        {item_id: {"lotes": [{"validade": date, "qtd": int}, ...],
-                   "sem_validade": int}}
-
-    A soma dos lotes + sem_validade sempre fecha com o saldo total.
-    Itens sem nenhuma entrada com validade não aparecem no resultado.
-    """
-    if item_ids is not None and not item_ids:
-        return {}
-    query = db.session.query(
-        Movimentacao.item_id,
-        Movimentacao.tipo,
-        Movimentacao.quantidade,
-        Movimentacao.validade,
-    )
-    if item_ids is not None:
-        query = query.filter(Movimentacao.item_id.in_(item_ids))
-    movs = query.order_by(
-        Movimentacao.item_id, Movimentacao.validade, Movimentacao.id
-    ).all()
-
-    lotes = defaultdict(list)  # item_id -> [(validade, quantidade)]
-    consumo = defaultdict(int)
-    saldo = defaultdict(int)
-    for item_id, tipo, quantidade, validade in movs:
-        if tipo == "saida":
-            saldo[item_id] -= quantidade
-            consumo[item_id] += quantidade
-        elif tipo == "ajuste":
-            saldo[item_id] += quantidade  # quantidade já vem com sinal
-            if quantidade < 0:
-                consumo[item_id] += -quantidade
-        elif validade is not None:  # entrada com validade vira lote
-            saldo[item_id] += quantidade
-            lotes[item_id].append([validade, quantidade])
-
-    resultado = {}
-    for item_id, lista in lotes.items():
-        resto = consumo.get(item_id, 0)
-        for lote in lista:  # já ordenadas por validade, depois id
-            lote[1], resto = max(0, lote[1] - resto), max(0, resto - lote[1])
-        restante_em_lotes = sum(l[1] for l in lista)
-        resultado[item_id] = {
-            "lotes": [
-                {"validade": v, "qtd": q} for v, q in lista if q > 0
-            ],
-            "sem_validade": max(
-                0, saldo.get(item_id, 0) - restante_em_lotes
-            ),
-        }
-    return resultado
 
 
 def opcoes_autocomplete():

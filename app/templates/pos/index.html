@@ -53,7 +53,7 @@
         {{ sugestoes_itens(autocomplete) }}
         <form method="post" action="{{ url_for('pos.adicionar') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input class="form-control form-control-lg input-leitura mb-3" name="codigo" autofocus autocomplete="off"
+          <input class="form-control form-control-lg input-leitura mb-3" name="codigo" autofocus autocomplete="new-password"
                  placeholder="Digite o nome do produto ou código" list="sugestoes-itens"
                  spellcheck="false" required>
           <div class="form-check mb-3">

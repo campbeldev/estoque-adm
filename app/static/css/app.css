@@ -65,6 +65,10 @@ main.container {
   font-weight: 600;
 }
 
+.solicitacao-linha {
+  cursor: pointer;
+}
+
 /* Botões levemente firmes */
 .btn {
   --bs-btn-font-weight: 500;

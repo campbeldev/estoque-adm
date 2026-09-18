@@ -18,6 +18,31 @@ def migrar_leve():
     # 2) colunas novas na movimentacao (SQLite e PostgreSQL aceitam ADD COLUMN)
     insp = inspect(db.engine)
     colunas = {c["name"] for c in insp.get_columns("movimentacao")}
+    colunas_solicitacao = {c["name"] for c in insp.get_columns("solicitacao")}
+    if "etapa" not in colunas_solicitacao:
+        db.session.execute(
+            db.text(
+                "ALTER TABLE solicitacao ADD COLUMN etapa VARCHAR(20) "
+                "NOT NULL DEFAULT 'pendente'"
+            )
+        )
+    if "motivo_encerramento" not in colunas_solicitacao:
+        db.session.execute(
+            db.text(
+                "ALTER TABLE solicitacao ADD COLUMN motivo_encerramento VARCHAR(255)"
+            )
+        )
+    if "data_encerramento" not in colunas_solicitacao:
+        db.session.execute(
+            db.text("ALTER TABLE solicitacao ADD COLUMN data_encerramento TIMESTAMP")
+        )
+    if "usuario_encerramento_id" not in colunas_solicitacao:
+        db.session.execute(
+            db.text(
+                "ALTER TABLE solicitacao ADD COLUMN usuario_encerramento_id INTEGER "
+                "REFERENCES usuario(id)"
+            )
+        )
     if "nota_id" not in colunas:
         db.session.execute(
             db.text(
@@ -30,10 +55,6 @@ def migrar_leve():
             db.text(
                 "ALTER TABLE movimentacao ADD COLUMN valor_unitario_cents INTEGER"
             )
-        )
-    if "validade" not in colunas:
-        db.session.execute(
-            db.text("ALTER TABLE movimentacao ADD COLUMN validade DATE")
         )
     db.session.execute(
         db.text(
@@ -56,6 +77,13 @@ def migrar_leve():
                 "REFERENCES remessa(id)"
             )
         )
+    if "item_solicitacao_id" not in colunas:
+        db.session.execute(
+            db.text(
+                "ALTER TABLE movimentacao ADD COLUMN item_solicitacao_id INTEGER "
+                "REFERENCES item_solicitacao(id)"
+            )
+        )
     if "setor_id" not in colunas:
         db.session.execute(
             db.text(
@@ -67,6 +95,12 @@ def migrar_leve():
         db.text(
             "CREATE INDEX IF NOT EXISTS ix_movimentacao_remessa "
             "ON movimentacao (remessa_id)"
+        )
+    )
+    db.session.execute(
+        db.text(
+            "CREATE INDEX IF NOT EXISTS ix_movimentacao_item_solicitacao "
+            "ON movimentacao (item_solicitacao_id)"
         )
     )
 
@@ -108,17 +142,4 @@ def migrar_leve():
             notas_por_chave[chave] = nota
         mov.nota_id = nota.id
 
-    # 4) entradas legadas sem validade herdam a do cadastro do item
-    #    (antes a validade morava lá; hoje ela é do lote) — idempotente:
-    #    só pega NULL. O modelo atual não tem mais Item.validade, então a
-    #    atualização é via SQL puro, só em bancos que ainda têm a coluna.
-    colunas_item = {c["name"] for c in insp.get_columns("item")}
-    if "validade" in colunas_item:
-        db.session.execute(
-            db.text(
-                "UPDATE movimentacao SET validade = ("
-                "SELECT validade FROM item WHERE item.id = movimentacao.item_id"
-                ") WHERE tipo = 'entrada' AND validade IS NULL"
-            )
-        )
     db.session.commit()
