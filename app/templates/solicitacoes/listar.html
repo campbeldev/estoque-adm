@@ -22,6 +22,7 @@
         <th>Obra</th>
         <th>Setor</th>
         <th>Itens</th>
+        <th>Status</th>
         <th>Registrado por</th>
       </tr>
     </thead>
@@ -29,10 +30,30 @@
       {% for solicitacao in solicitacoes %}
       <tr>
         <td>{{ formatar_data_hora(solicitacao.data_criacao) }}</td>
-        <td>{{ solicitacao.solicitante }}</td>
+        <td>
+            <a href="{{ url_for('solicitacoes.detalhe', solicitacao_id=solicitacao.id) }}">
+                {{ solicitacao.solicitante }}
+            </a>
+        </td>
         <td>{{ solicitacao.obra.nome }}</td>
         <td>{{ solicitacao.setor.nome }}</td>
         <td>{{ solicitacao.itens|length }}</td>
+        <td>
+            <span class="badge
+              {% if solicitacao.status_exibicao == 'Parcialmente atendida' %}
+              text-bg-warning text-dark
+              {% elif solicitacao.status_exibicao == 'Atendida' %}
+              text-bg-success
+              {% else %}
+              text-bg-secondary
+              {% endif %}
+              ">
+              {{ solicitacao.status_exibicao }}
+            </span>
+            <small class="text-muted">
+                {{solicitacao.itens_atendidos}}/{{solicitacao.total_itens}} completos
+            </small>
+        </td>
         <td>{{ solicitacao.usuario.nome }}</td>
       </tr>
       {% endfor %}

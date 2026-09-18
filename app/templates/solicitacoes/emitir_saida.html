@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block titulo %}Emitir saída · Solicitação #{{ solicitacao.id }}{% endblock %}
+
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Emitir saída</h1>
+    <p class="text-muted mb-0">
+      Solicitação #{{ solicitacao.id }} · {{ solicitacao.solicitante }}
+    </p>
+  </div>
+
+  <a class="btn btn-outline-secondary"
+     href="{{ url_for('solicitacoes.detalhe', solicitacao_id=solicitacao.id) }}">
+    Voltar
+  </a>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <strong>Destino:</strong>
+    {{ solicitacao.obra.nome }} · {{ solicitacao.setor.nome }}
+  </div>
+</div>
+
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if not solicitacao.obra.eh_sede %}
+  <div class="card mb-3">
+    <div class="card-body">
+      <label class="form-label" for="entregador_id">
+        Entregador
+      </label>
+      <select class="form-select" id="entregador_id"
+              name="entregador_id" required>
+        <option value="">Selecione o entregador...</option>
+        {% for entregador in entregadores %}
+        <option value="{{ entregador.id }}">
+          {{ entregador.nome }}
+          {% if entregador.contato %} · {{ entregador.contato }}{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      <div class="form-text">
+        Necessário para saídas destinadas a obras.
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-header">
+      Itens da solicitação
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Pedido</th>
+            <th>Atendido</th>
+            <th>Restante</th>
+            <th>Estoque disponível</th>
+            <th>Quantidade a atender</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item_solicitado in solicitacao.itens %}
+          <tr>
+            <td>
+              <input type="hidden"
+                     name="item_solicitacao_id"
+                     value="{{ item_solicitado.id }}">
+              {{ item_solicitado.item.nome }}
+            </td>
+            <td>{{ item_solicitado.quantidade }}</td>
+            <td>{{ item_solicitado.quantidade_atendida }}</td>
+            <td>{{ item_solicitado.quantidade_restante }}</td>
+            <td>{{ saldos.get(item_solicitado.item_id, 0) }}</td>
+            <td>
+              {% if item_solicitado.quantidade_restante > 0 %}
+              <input
+                class="form-control"
+                name="quantidade"
+                type="number"
+                min="0"
+                max="{{ [
+                  item_solicitado.quantidade_restante,
+                  saldos.get(item_solicitado.item_id, 0)
+                ] | min }}"
+                value="0"
+              >
+              {% else %}
+              <input type="hidden"
+                     name="quantidade"
+                     value="0">
+              <span class="badge text-bg-success">Completo</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card-footer text-end">
+      <button class="btn btn-primary" type="submit">
+        Confirmar saída
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}

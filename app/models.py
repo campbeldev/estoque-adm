@@ -15,6 +15,7 @@ UNIDADES_EXIBICAO = {"un": "un", "pc": "pç", "cx": "cx"}
 TIPOS_EXIBICAO = {"entrada": "Entrada", "saida": "Saída", "ajuste": "Ajuste"}
 
 PERFIS = ("admin", "operador")
+ETAPAS_SOLICITACAO = ("pendente", "recusada", "cancelada")
 
 
 class Usuario(db.Model):
@@ -141,16 +142,41 @@ class Solicitacao(db.Model):
     setor_id = db.Column(db.Integer, db.ForeignKey("setor.id"), nullable=False)
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuario.id"), nullable=False)
     data_criacao = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    
+    etapa = db.Column(db.String(20), nullable=False, default="pendente")
+    motivo_encerramento = db.Column(db.String(255))
+    data_encerramento = db.Column(db.DateTime)
+    usuario_encerramento_id = db.Column(db.Integer, db.ForeignKey("usuario.id"))
 
     obra = db.relationship("Obra", lazy="joined")
     setor = db.relationship("Setor", lazy="joined")
-    usuario = db.relationship("Usuario", lazy="joined")
-    itens = db.relationship(
-        "ItemSolicitacao",
-        lazy="selectin",
-        order_by="ItemSolicitacao.id",
-        back_populates="solicitacao",
-    )
+    usuario = db.relationship("Usuario", lazy="joined", foreign_keys=[usuario_id])
+    usuario_encerramento = db.relationship("Usuario", lazy="joined", foreign_keys=[usuario_encerramento_id])
+    itens = db.relationship("ItemSolicitacao", lazy="selectin", order_by="ItemSolicitacao.id", back_populates="solicitacao",)
+
+    @property
+    def status_exibicao(self):
+        if self.etapa == "recusada":
+            return "Recusada"
+
+        if self.etapa == "cancelada":
+            return "Cancelada"
+
+        if self.itens and all(item.atendido for item in self.itens):
+            return "Atendida"
+
+        if any(item.quantidade_atendida > 0 for item in self.itens):
+            return "Parcialmente atendida"
+
+        return "Pendente"
+
+    @property
+    def itens_atendidos(self):
+        return sum(1 for item in self.itens if item.atendido)
+
+    @property
+    def total_itens(self):
+        return len(self.itens)
   
 class ItemSolicitacao(db.Model):
     __tablename__ = "item_solicitacao"
@@ -162,6 +188,23 @@ class ItemSolicitacao(db.Model):
 
     solicitacao = db.relationship("Solicitacao", lazy="joined", back_populates="itens")
     item = db.relationship("Item", lazy="joined")
+    movimentacoes = db.relationship("Movimentacao", lazy="selectin",back_populates="item_solicitacao",)
+
+    @property
+    def quantidade_atendida(self):
+        return sum(
+            movimentacao.quantidade
+            for movimentacao in self.movimentacoes
+            if movimentacao.tipo == "saida"
+        )
+
+    @property
+    def quantidade_restante(self):
+        return max(0, self.quantidade - self.quantidade_atendida)
+
+    @property
+    def atendido(self):
+        return self.quantidade_restante == 0
 
 
 class Remessa(db.Model):
@@ -241,6 +284,7 @@ class Movimentacao(db.Model):
         db.Index("ix_movimentacao_item", "item_id"),
         db.Index("ix_movimentacao_tipo", "tipo"),
         db.Index("ix_movimentacao_remessa", "remessa_id"),
+        db.Index("ix_movimentacao_item_solicitacao", "item_solicitacao_id"),
         db.CheckConstraint(
             "tipo IN ('entrada', 'saida', 'ajuste')", name="ck_movimentacao_tipo"
         ),
@@ -256,6 +300,7 @@ class Movimentacao(db.Model):
     obra_id = db.Column(db.Integer, db.ForeignKey("obra.id"))  # destino (saída)
     setor_id = db.Column(db.Integer, db.ForeignKey("setor.id"))  # área do destino (saída)
     remessa_id = db.Column(db.Integer, db.ForeignKey("remessa.id"))  # logística (saída)
+    item_solicitacao_id = db.Column(db.Integer, db.ForeignKey("item_solicitacao.id"))
     # Legado (deprecado): as entradas novas gravam fornecedor/nota_fiscal
     # como cópia para exibição, mas a fonte canônica é a Nota.
     fornecedor = db.Column(db.String(120))  # entrada
@@ -273,6 +318,7 @@ class Movimentacao(db.Model):
     obra = db.relationship("Obra", lazy="joined")
     setor = db.relationship("Setor", lazy="joined")
     remessa = db.relationship("Remessa", lazy="joined")
+    item_solicitacao = db.relationship("ItemSolicitacao",lazy="joined",back_populates="movimentacoes",)
     nota = db.relationship("Nota", lazy="joined")
 
     @property

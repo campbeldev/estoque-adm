@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block titulo %}Solicitação #{{ solicitacao.id }} · Controle de Estoque{% endblock %}
+
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Solicitação #{{ solicitacao.id }}</h1>
+    <p class="text-muted mb-0">
+      Registrada em {{ formatar_data_hora(solicitacao.data_criacao) }}
+    </p>
+  </div>
+
+  <div class="d-flex gap-2">
+  {% if solicitacao.status_exibicao not in ["Atendida", "Recusada", "Cancelada"] %}
+  <a class="btn btn-primary"
+     href="{{ url_for('solicitacoes.emitir_saida', solicitacao_id=solicitacao.id) }}">
+    Emitir saída
+  </a>
+  {% endif %}
+
+  <a class="btn btn-outline-secondary"
+     href="{{ url_for('solicitacoes.listar') }}">
+    Voltar
+  </a>
+</div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <strong>Solicitante</strong>
+        <div>{{ solicitacao.solicitante }}</div>
+      </div>
+
+      <div class="col-md-3">
+        <strong>Obra</strong>
+        <div>{{ solicitacao.obra.nome }}</div>
+      </div>
+
+      <div class="col-md-3">
+        <strong>Setor</strong>
+        <div>{{ solicitacao.setor.nome }}</div>
+      </div>
+
+      <div class="col-md-3">
+        <strong>Status</strong>
+        <div>
+          <span class="badge text-bg-secondary">
+            {{ solicitacao.status_exibicao }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    Itens solicitados
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Quantidade pedida</th>
+          <th>Quantidade atendida</th>
+          <th>Restante</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item_solicitado in solicitacao.itens %}
+        <tr>
+          <td>{{ item_solicitado.item.nome }}</td>
+          <td>{{ item_solicitado.quantidade }}</td>
+          <td>{{ item_solicitado.quantidade_atendida }}</td>
+          <td>{{ item_solicitado.quantidade_restante }}</td>
+          <td>
+            {% if item_solicitado.atendido %}
+            <span class="badge text-bg-success">Atendido</span>
+            {% else %}
+            <span class="badge text-bg-warning">Pendente</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
